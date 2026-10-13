@@ -281,8 +281,13 @@ threading model rather than from this library.
   ODR violation that may only show up as crashes.
 - The libwebrtc binding must be compiled against the same libwebrtc headers, defines and standard
   library as the application's libwebrtc build.
-- Nothing is logged until a handler is set: `Logger::SetDefaultHandler()` (stdout) or
-  `Logger::SetHandler()` with your own, and `Logger::SetLogLevel()`.
+- Nothing is logged until a handler is set: `clientmonitor::Logger::SetDefaultHandler()` (stdout)
+  or `clientmonitor::Logger::SetHandler()` with your own, and `clientmonitor::Logger::SetLogLevel()`.
+- Every header lives under `include/clientmonitor/` and is included with that prefix
+  (`<clientmonitor/Logger.hpp>`), because libmediasoupclient puts its own `Logger.hpp`,
+  `Transport.hpp`, ... on the include path unprefixed. The two loggers coexist: ours is
+  `clientmonitor::Logger` with `CM_*` macros, theirs `mediasoupclient::Logger` with `MSC_*`. The
+  unqualified global `Logger` alias belongs to libmediasoupclient, so always qualify ours.
 
 ## Layout
 
