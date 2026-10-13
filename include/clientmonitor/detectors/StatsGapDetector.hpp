@@ -7,7 +7,7 @@
 #include <optional>
 #include <string>
 
-namespace clientmonitor
+namespace observertc::clientmonitor
 {
 	// Fast forward declarations.
 	class ClientMonitor;
@@ -30,6 +30,6 @@ namespace clientmonitor
 		ClientMonitor* clientMonitor{ nullptr };
 		std::optional<int64_t> previousCollectionStartedAt;
 	};
-} // namespace clientmonitor
+} // namespace observertc::clientmonitor
 
 #endif

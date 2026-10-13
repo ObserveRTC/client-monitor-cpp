@@ -1,7 +1,7 @@
 #ifndef CM_SCHEMA_CLIENT_EVENT_TYPES_HPP
 #define CM_SCHEMA_CLIENT_EVENT_TYPES_HPP
 
-namespace clientmonitor
+namespace observertc::clientmonitor
 {
 	/** The client event types the library reports. Port of the JS `ClientEventTypes`. */
 	namespace ClientEventTypes
@@ -66,6 +66,6 @@ namespace clientmonitor
 		constexpr const char* PLATFORM{ "PLATFORM" };
 		constexpr const char* BROWSER{ "BROWSER" };
 	} // namespace ClientMetaTypes
-} // namespace clientmonitor
+} // namespace observertc::clientmonitor
 
 #endif

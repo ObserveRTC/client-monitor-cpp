@@ -80,6 +80,9 @@ Follow libmediasoupclient's style (see the README's Conventions section):
 
 - `PascalCase` methods, `camelCase` members, `this->` on every member access, tabs, Allman braces;
   format with the repository's `.clang-format`.
+- Namespace `observertc::clientmonitor` (written as `namespace observertc::clientmonitor`),
+  bindings in `observertc::clientmonitor::{libwebrtc,mediasoupclient}`. Macros use fully
+  qualified names (`observertc::clientmonitor::Logger`).
 - Events go through nested abstract `Listener` classes with default no-op virtuals
   (`ClientMonitor::Listener`). Do not introduce an event emitter or `std::function` signals.
 - Every `.cpp` starts with `#define CM_CLASS "ClassName"` and logs through `CM_DEBUG` / `CM_WARN` /

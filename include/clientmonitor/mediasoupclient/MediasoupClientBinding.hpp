@@ -34,7 +34,7 @@
 #include <future>
 #include <string>
 
-namespace clientmonitor
+namespace observertc::clientmonitor
 {
 	namespace mediasoupclient
 	{
@@ -143,6 +143,6 @@ namespace clientmonitor
 			::mediasoupclient::RecvTransport::Listener* inner{ nullptr };
 		};
 	} // namespace mediasoupclient
-} // namespace clientmonitor
+} // namespace observertc::clientmonitor
 
 #endif

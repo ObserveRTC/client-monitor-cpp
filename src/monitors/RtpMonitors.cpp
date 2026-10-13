@@ -12,10 +12,10 @@
 #include <cmath>
 #include <numeric>
 
-using clientmonitor::utils::PositiveDelta;
-using clientmonitor::utils::ToDouble;
+using observertc::clientmonitor::utils::PositiveDelta;
+using observertc::clientmonitor::utils::ToDouble;
 
-namespace clientmonitor
+namespace observertc::clientmonitor
 {
 	/* InboundRtpMonitor */
 
@@ -664,4 +664,4 @@ namespace clientmonitor
 
 		return transport ? transport->GetSelectedCandidatePair() : nullptr;
 	}
-} // namespace clientmonitor
+} // namespace observertc::clientmonitor

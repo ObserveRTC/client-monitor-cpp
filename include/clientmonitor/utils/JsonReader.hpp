@@ -9,7 +9,7 @@
 #include <optional>
 #include <string>
 
-namespace clientmonitor
+namespace observertc::clientmonitor
 {
 	namespace detail
 	{
@@ -131,6 +131,6 @@ namespace clientmonitor
 			return value;
 		}
 	} // namespace detail
-} // namespace clientmonitor
+} // namespace observertc::clientmonitor
 
 #endif

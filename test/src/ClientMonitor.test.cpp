@@ -10,7 +10,7 @@
 #include <thread>
 
 using json = nlohmann::json;
-using namespace clientmonitor;
+using namespace observertc::clientmonitor;
 
 TEST_CASE("ClientMonitor", "[ClientMonitor]")
 {
@@ -216,7 +216,7 @@ TEST_CASE("ClientMonitor", "[ClientMonitor]")
 
 	SECTION("the timer collects on its own thread and Close() stops it")
 	{
-		clientmonitor::utils::SetClock(nullptr);
+		observertc::clientmonitor::utils::SetClock(nullptr);
 
 		struct CountingListener : public ClientMonitor::Listener
 		{
@@ -247,7 +247,7 @@ TEST_CASE("ClientMonitor", "[ClientMonitor]")
 
 	SECTION("Close() from inside a listener on the timer thread does not deadlock")
 	{
-		clientmonitor::utils::SetClock(nullptr);
+		observertc::clientmonitor::utils::SetClock(nullptr);
 
 		struct ClosingListener : public ClientMonitor::Listener
 		{

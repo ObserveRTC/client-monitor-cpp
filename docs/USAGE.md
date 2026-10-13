@@ -1,6 +1,6 @@
 # Using client-monitor-cpp
 
-Recipes for the public API of `clientmonitor::ClientMonitor`. The snippets come from
+Recipes for the public API of `observertc::clientmonitor::ClientMonitor`. The snippets come from
 [`examples/api_tour.cpp`](../examples/api_tour.cpp), which CI compiles and runs, so keep the two in
 sync.
 
@@ -14,6 +14,9 @@ call `Collect()` on the WebRTC signaling thread.
 
 using json = nlohmann::json;
 ```
+
+Everything is in `observertc::clientmonitor`. The snippets spell it out; in your code
+`namespace cm = observertc::clientmonitor;` keeps it short.
 
 - [Create a monitor](#create-a-monitor)
 - [Listen](#listen)
@@ -33,7 +36,7 @@ using json = nlohmann::json;
 ## Create a monitor
 
 ```cpp
-clientmonitor::ClientMonitorConfig config;
+observertc::clientmonitor::ClientMonitorConfig config;
 
 config.clientId             = "client-1"; // optional, both go into every sample
 config.callId               = "call-1";
@@ -41,7 +44,7 @@ config.collectingPeriodInMs = 5000;       // the internal timer thread collects;
 config.samplingPeriodInMs   = 5000;       // a ClientSample every 5s; 0 = no samples
 
 AppListener listener;
-clientmonitor::ClientMonitor monitor(config, &listener); // the listener may be nullptr
+observertc::clientmonitor::ClientMonitor monitor(config, &listener); // the listener may be nullptr
 
 // Free-form data copied into every sample.
 monitor.SetAttachments({ { "roomId", "room-42" }, { "userId", "user-7" } });
@@ -62,28 +65,28 @@ Callbacks run on the collecting thread (or the thread that called the API that t
 with the monitor's lock held: keep them short and never block on the signaling thread there.
 
 ```cpp
-class AppListener : public clientmonitor::ClientMonitor::Listener
+class AppListener : public observertc::clientmonitor::ClientMonitor::Listener
 {
 public:
-	void OnSampleCreated(clientmonitor::ClientMonitor*, const clientmonitor::ClientSample& sample) override
+	void OnSampleCreated(observertc::clientmonitor::ClientMonitor*, const observertc::clientmonitor::ClientSample& sample) override
 	{
 		// Queue it for your network thread; do not send it from here.
 		queue.Push(sample.ToJson().dump());
 	}
 
-	void OnIssue(clientmonitor::ClientMonitor*, const clientmonitor::ReportedClientIssue& issue) override
+	void OnIssue(observertc::clientmonitor::ClientMonitor*, const observertc::clientmonitor::ReportedClientIssue& issue) override
 	{
 		// issue.resolvable: true for RaiseIssue(), false for AddIssue(). issue.key is empty for the latter.
 	}
 
-	void OnIssueUpdated(clientmonitor::ClientMonitor*, const clientmonitor::RaisedClientIssue& issue) override {}
+	void OnIssueUpdated(observertc::clientmonitor::ClientMonitor*, const observertc::clientmonitor::RaisedClientIssue& issue) override {}
 
-	void OnIssueResolved(clientmonitor::ClientMonitor*, const clientmonitor::ResolvedClientIssue& issue) override
+	void OnIssueResolved(observertc::clientmonitor::ClientMonitor*, const observertc::clientmonitor::ResolvedClientIssue& issue) override
 	{
 		// issue.key, issue.comment, issue.resolvedAt - issue.raisedAt
 	}
 
-	void OnClientEvent(clientmonitor::ClientMonitor*, const clientmonitor::ClientEvent& event) override {}
+	void OnClientEvent(observertc::clientmonitor::ClientMonitor*, const observertc::clientmonitor::ClientEvent& event) override {}
 };
 ```
 
@@ -106,7 +109,7 @@ monitor.AddEvent("USER_RAISED_HAND", { { "userId", "user-7" } });
 
 // One of the library's types, with an explicit timestamp.
 monitor.AddEvent(
-  clientmonitor::ClientEventTypes::MEDIA_TRACK_MUTED,
+  observertc::clientmonitor::ClientEventTypes::MEDIA_TRACK_MUTED,
   { { "trackId", "local-audio" }, { "reason", "user" } },
   1700000000000);
 ```
@@ -126,7 +129,7 @@ Facts about the client rather than moments in the call. Same shape as `AddEvent`
 
 ```cpp
 monitor.AddMetaData(
-  clientmonitor::ClientMetaTypes::OPERATION_SYSTEM, { { "name", "macOS" }, { "version", "15.1" } });
+  observertc::clientmonitor::ClientMetaTypes::OPERATION_SYSTEM, { { "name", "macOS" }, { "version", "15.1" } });
 ```
 
 ## Issues
@@ -245,9 +248,9 @@ Return `std::nullopt` to report nothing this time.
 
 ```cpp
 const auto handle = monitor.AddExtensionStatsProvider(
-  [&cpu]() -> std::optional<clientmonitor::ClientMonitor::ExtensionStatsInput>
+  [&cpu]() -> std::optional<observertc::clientmonitor::ClientMonitor::ExtensionStatsInput>
   {
-	  return clientmonitor::ClientMonitor::ExtensionStatsInput{ "system-metrics", { { "cpu", cpu.Read() } }, std::string("system") };
+	  return observertc::clientmonitor::ClientMonitor::ExtensionStatsInput{ "system-metrics", { { "cpu", cpu.Read() } }, std::string("system") };
   });
 
 // later
@@ -265,12 +268,12 @@ Anything else feeds a `StatsCollector`. `FunctionStatsCollector` wraps a callabl
 W3C stats report as a JSON array:
 
 ```cpp
-auto collector = std::make_shared<clientmonitor::FunctionStatsCollector>([&]() { return GetMyStatsAsJson(); });
+auto collector = std::make_shared<observertc::clientmonitor::FunctionStatsCollector>([&]() { return GetMyStatsAsJson(); });
 
 auto* peerConnection = monitor.AddPeerConnection(collector, "pc-1", { { "role", "recv" } }); // id and attachments optional
 
 peerConnection->AddMediaTrack(
-  std::make_shared<clientmonitor::BasicMediaTrack>("remote-audio", "audio"), { { "participant", "alice" } });
+  std::make_shared<observertc::clientmonitor::BasicMediaTrack>("remote-audio", "audio"), { { "participant", "alice" } });
 
 // When done: monitor.RemovePeerConnection("pc-1");
 ```
@@ -285,7 +288,7 @@ track. Detectors use it, for example a paused track is not reported as dry. It c
 the track exists; it is applied when the track appears.
 
 ```cpp
-clientmonitor::InboundTrackContext context;
+observertc::clientmonitor::InboundTrackContext context;
 
 context.paused = true; // e.g. a mediasoup consumer created paused
 monitor.SetInboundTrackContext("remote-audio", context);
@@ -344,11 +347,11 @@ double score = monitor.GetScore();
 ## Logging
 
 ```cpp
-clientmonitor::Logger::SetDefaultHandler(); // stdout; or SetHandler(myHandler)
-clientmonitor::Logger::SetLogLevel(clientmonitor::Logger::LogLevel::LOG_WARN);
+observertc::clientmonitor::Logger::SetDefaultHandler(); // stdout; or SetHandler(myHandler)
+observertc::clientmonitor::Logger::SetLogLevel(observertc::clientmonitor::Logger::LogLevel::LOG_WARN);
 ```
 
-This is `clientmonitor::Logger`, separate from libmediasoupclient's `mediasoupclient::Logger`;
+This is `observertc::clientmonitor::Logger`, separate from libmediasoupclient's `mediasoupclient::Logger`;
 set up both if you want both.
 
 ## Close

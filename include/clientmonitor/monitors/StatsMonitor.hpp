@@ -5,7 +5,7 @@
 
 #include <optional>
 
-namespace clientmonitor
+namespace observertc::clientmonitor
 {
 	// Fast forward declarations.
 	class PeerConnectionMonitor;
@@ -111,6 +111,6 @@ namespace clientmonitor
 		double statsClockTime{ 0 };
 		nlohmann::json appData = nlohmann::json::object();
 	};
-} // namespace clientmonitor
+} // namespace observertc::clientmonitor
 
 #endif

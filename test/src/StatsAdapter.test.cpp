@@ -4,7 +4,7 @@
 #include <catch.hpp>
 
 using json = nlohmann::json;
-using namespace clientmonitor;
+using namespace observertc::clientmonitor;
 
 namespace
 {

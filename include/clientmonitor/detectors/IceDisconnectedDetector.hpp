@@ -7,7 +7,7 @@
 #include <optional>
 #include <string>
 
-namespace clientmonitor
+namespace observertc::clientmonitor
 {
 	// Fast forward declarations.
 	class IceTransportMonitor;
@@ -50,6 +50,6 @@ namespace clientmonitor
 		PeerConnectionMonitor* peerConnection{ nullptr };
 		std::map<std::string, TransportState> states;
 	};
-} // namespace clientmonitor
+} // namespace observertc::clientmonitor
 
 #endif

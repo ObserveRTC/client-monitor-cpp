@@ -2,7 +2,7 @@
 
 #include <chrono>
 
-namespace clientmonitor
+namespace observertc::clientmonitor
 {
 	IntervalTimer::~IntervalTimer()
 	{
@@ -108,4 +108,4 @@ namespace clientmonitor
 
 		return this->thread.joinable();
 	}
-} // namespace clientmonitor
+} // namespace observertc::clientmonitor

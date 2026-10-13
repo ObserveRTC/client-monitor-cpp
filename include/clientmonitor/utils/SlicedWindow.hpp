@@ -9,7 +9,7 @@
 #include <string>
 #include <vector>
 
-namespace clientmonitor
+namespace observertc::clientmonitor
 {
 	/**
 	 * A rolling buffer of running totals with a fixed set of named slices over it, each reporting
@@ -105,6 +105,6 @@ namespace clientmonitor
 		std::map<std::string, std::unique_ptr<Slice>> slices;
 		std::optional<double> lastTimestamp;
 	};
-} // namespace clientmonitor
+} // namespace observertc::clientmonitor
 
 #endif

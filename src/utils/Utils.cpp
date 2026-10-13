@@ -5,7 +5,7 @@
 #include <mutex>
 #include <random>
 
-namespace clientmonitor
+namespace observertc::clientmonitor
 {
 	namespace utils
 	{
@@ -65,4 +65,4 @@ namespace clientmonitor
 			return buffer;
 		}
 	} // namespace utils
-} // namespace clientmonitor
+} // namespace observertc::clientmonitor

@@ -8,7 +8,7 @@
 #include <optional>
 #include <string>
 
-namespace clientmonitor
+namespace observertc::clientmonitor
 {
 	/**
 	 * Detector configurations. Every detector is on by default with the same defaults as the JS
@@ -146,6 +146,6 @@ namespace clientmonitor
 			IceDisconnectedDetectorConfig{}
 		};
 	};
-} // namespace clientmonitor
+} // namespace observertc::clientmonitor
 
 #endif

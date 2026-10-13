@@ -6,7 +6,7 @@
 #include <algorithm>
 #include <exception>
 
-namespace clientmonitor
+namespace observertc::clientmonitor
 {
 	Detector* Detectors::Add(std::unique_ptr<Detector> detector)
 	{
@@ -169,4 +169,4 @@ namespace clientmonitor
 			}
 		}
 	}
-} // namespace clientmonitor
+} // namespace observertc::clientmonitor

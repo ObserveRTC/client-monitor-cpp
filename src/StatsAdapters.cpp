@@ -12,7 +12,7 @@
 
 using json = nlohmann::json;
 
-namespace clientmonitor
+namespace observertc::clientmonitor
 {
 	namespace
 	{
@@ -443,4 +443,4 @@ namespace clientmonitor
 		InferRtpCrossReferences(stats);
 		InferCodecId(stats);
 	}
-} // namespace clientmonitor
+} // namespace observertc::clientmonitor

@@ -9,7 +9,7 @@
 #include <string>
 #include <vector>
 
-namespace clientmonitor
+namespace observertc::clientmonitor
 {
 	// Fast forward declarations.
 	class CodecMonitor;
@@ -303,6 +303,6 @@ namespace clientmonitor
 	private:
 		Metrics metrics;
 	};
-} // namespace clientmonitor
+} // namespace observertc::clientmonitor
 
 #endif

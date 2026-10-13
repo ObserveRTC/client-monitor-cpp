@@ -6,7 +6,7 @@
 
 #include <algorithm>
 
-namespace clientmonitor
+namespace observertc::clientmonitor
 {
 	namespace
 	{
@@ -235,4 +235,4 @@ namespace clientmonitor
 	{
 		this->Notify({ issue.type, issue.payload, issue.timestamp, issue.includeInSample });
 	}
-} // namespace clientmonitor
+} // namespace observertc::clientmonitor

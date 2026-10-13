@@ -4,7 +4,7 @@
 #include <cmath>
 #include <stdexcept>
 
-namespace clientmonitor
+namespace observertc::clientmonitor
 {
 	namespace
 	{
@@ -219,4 +219,4 @@ namespace clientmonitor
 			slice.deltas[i] = EndpointDelta(from->values[i], to->values[i]);
 		}
 	}
-} // namespace clientmonitor
+} // namespace observertc::clientmonitor

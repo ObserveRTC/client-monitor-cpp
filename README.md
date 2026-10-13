@@ -131,9 +131,9 @@ libmediasoupclient, add it before this block and set `CLIENTMONITOR_MEDIASOUPCLI
   #include <android/log.h>
   #include <clientmonitor/Logger.hpp>
 
-  class LogcatHandler : public clientmonitor::Logger::LogHandlerInterface
+  class LogcatHandler : public observertc::clientmonitor::Logger::LogHandlerInterface
   {
-  	void OnLog(clientmonitor::Logger::LogLevel /*level*/, char* payload, size_t /*len*/) override
+  	void OnLog(observertc::clientmonitor::Logger::LogLevel /*level*/, char* payload, size_t /*len*/) override
   	{
   		__android_log_print(ANDROID_LOG_INFO, "ClientMonitor", "%s", payload);
   	}
@@ -141,8 +141,8 @@ libmediasoupclient, add it before this block and set `CLIENTMONITOR_MEDIASOUPCLI
 
   static LogcatHandler logcatHandler;
 
-  clientmonitor::Logger::SetHandler(&logcatHandler);
-  clientmonitor::Logger::SetLogLevel(clientmonitor::Logger::LogLevel::LOG_WARN);
+  observertc::clientmonitor::Logger::SetHandler(&logcatHandler);
+  observertc::clientmonitor::Logger::SetLogLevel(observertc::clientmonitor::Logger::LogLevel::LOG_WARN);
   ```
 
 **4. A Kotlin or Java app**
@@ -175,43 +175,43 @@ it against the checked-out sources to keep the instructions above honest.
 ## Use
 
 ```cpp
-class MyListener : public clientmonitor::ClientMonitor::Listener
+class MyListener : public observertc::clientmonitor::ClientMonitor::Listener
 {
 public:
-	void OnSampleCreated(clientmonitor::ClientMonitor*, const clientmonitor::ClientSample& sample) override
+	void OnSampleCreated(observertc::clientmonitor::ClientMonitor*, const observertc::clientmonitor::ClientSample& sample) override
 	{
 		observer.Send(sample.ToJson().dump());
 	}
 
-	void OnIssue(clientmonitor::ClientMonitor*, const clientmonitor::ReportedClientIssue& issue) override
+	void OnIssue(observertc::clientmonitor::ClientMonitor*, const observertc::clientmonitor::ReportedClientIssue& issue) override
 	{
 		// "dry-inbound-track", "transport-delay-degraded", "ice-disconnected", your own...
 	}
 };
 
-clientmonitor::ClientMonitorConfig config;
+observertc::clientmonitor::ClientMonitorConfig config;
 
 config.clientId = "client-1";
 config.callId   = "call-1";
 
 MyListener listener;
-clientmonitor::ClientMonitor monitor(config, &listener); // collects every 5s on its own thread
+observertc::clientmonitor::ClientMonitor monitor(config, &listener); // collects every 5s on its own thread
 
 // libmediasoupclient: decorate the transport listener, bind, report producers/consumers.
-clientmonitor::mediasoupclient::TransportMonitor transportMonitor(&monitor);
-clientmonitor::mediasoupclient::MonitoredSendTransportListener sendListener(&transportMonitor, &myListener);
+observertc::clientmonitor::mediasoupclient::TransportMonitor transportMonitor(&monitor);
+observertc::clientmonitor::mediasoupclient::MonitoredSendTransportListener sendListener(&transportMonitor, &myListener);
 auto* sendTransport = device.CreateSendTransport(&sendListener, ...);
 transportMonitor.Bind(sendTransport);
 auto* producer = sendTransport->Produce(...);
 transportMonitor.OnProducerCreated(producer);
 
 // Plain libwebrtc: decorate the PeerConnectionObserver, then bind.
-clientmonitor::libwebrtc::MonitoredPeerConnectionObserver observer(&monitor, &myObserver);
+observertc::clientmonitor::libwebrtc::MonitoredPeerConnectionObserver observer(&monitor, &myObserver);
 auto pc = factory->CreatePeerConnectionOrError(config, webrtc::PeerConnectionDependencies(&observer)).MoveValue();
 observer.Bind(pc);
 
 // Anything else: a StatsCollector returning the W3C report as a JSON array.
-monitor.AddPeerConnection(std::make_shared<clientmonitor::FunctionStatsCollector>([] { return GetMyStats(); }));
+monitor.AddPeerConnection(std::make_shared<observertc::clientmonitor::FunctionStatsCollector>([] { return GetMyStats(); }));
 ```
 
 **[docs/USAGE.md](docs/USAGE.md)** has a recipe for every API: `AddEvent`, `AddMetaData`,
@@ -286,12 +286,12 @@ threading model rather than from this library.
   ODR violation that may only show up as crashes.
 - The libwebrtc binding must be compiled against the same libwebrtc headers, defines and standard
   library as the application's libwebrtc build.
-- Nothing is logged until a handler is set: `clientmonitor::Logger::SetDefaultHandler()` (stdout)
-  or `clientmonitor::Logger::SetHandler()` with your own, and `clientmonitor::Logger::SetLogLevel()`.
+- Nothing is logged until a handler is set: `observertc::clientmonitor::Logger::SetDefaultHandler()` (stdout)
+  or `observertc::clientmonitor::Logger::SetHandler()` with your own, and `observertc::clientmonitor::Logger::SetLogLevel()`.
 - Every header lives under `include/clientmonitor/` and is included with that prefix
   (`<clientmonitor/Logger.hpp>`), because libmediasoupclient puts its own `Logger.hpp`,
   `Transport.hpp`, ... on the include path unprefixed. The two loggers coexist: ours is
-  `clientmonitor::Logger` with `CM_*` macros, theirs `mediasoupclient::Logger` with `MSC_*`. The
+  `observertc::clientmonitor::Logger` with `CM_*` macros, theirs `mediasoupclient::Logger` with `MSC_*`. The
   unqualified global `Logger` alias belongs to libmediasoupclient, so always qualify ours.
 
 ## Layout
@@ -318,7 +318,7 @@ The sample types come from the observertc-schemas project: `npm run generate:cpp
 `outputs/cpp/ClientSample.hpp`, `Samples.hpp` and `JsonSupport.hpp`, which are copied unchanged into
 `include/clientmonitor/schema/`. When the schema moves, regenerate there and copy the three files over. They live
 in `observertc::schemas`; `include/clientmonitor/schema/SchemaTypes.hpp` brings the client sample types into
-`clientmonitor`. Optional lists in a sample are `std::optional<std::vector<...>>`; the monitor always
+`observertc::clientmonitor`. Optional lists in a sample are `std::optional<std::vector<...>>`; the monitor always
 sets the ones it samples, so they appear in the JSON even when empty, as in the JS library.
 
 See [PORTING.md](PORTING.md) for what is ported, what is not yet, and where the C++ differs.
@@ -328,6 +328,8 @@ See [PORTING.md](PORTING.md) for what is ported, what is not yet, and where the 
 The code follows the conventions of [libmediasoupclient](https://github.com/versatica/libmediasoupclient),
 the native C++ mediasoup client:
 
+- everything lives in `observertc::clientmonitor`, next to the generated `observertc::schemas`
+  (an application can shorten it with `namespace cm = observertc::clientmonitor;`);
 - one class per concept, `PascalCase` methods (`GetId()`, `Close()`), `camelCase` members, and
   `this->` on every member access;
 - events through nested abstract `Listener` classes (`ClientMonitor::Listener`), not an event emitter;

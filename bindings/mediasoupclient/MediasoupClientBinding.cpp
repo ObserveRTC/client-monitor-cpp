@@ -7,7 +7,7 @@
 
 using json = nlohmann::json;
 
-namespace clientmonitor
+namespace observertc::clientmonitor
 {
 	namespace mediasoupclient
 	{
@@ -406,4 +406,4 @@ namespace clientmonitor
 			this->inner->OnConnectionStateChange(transport, connectionState);
 		}
 	} // namespace mediasoupclient
-} // namespace clientmonitor
+} // namespace observertc::clientmonitor

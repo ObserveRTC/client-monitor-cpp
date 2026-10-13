@@ -11,7 +11,7 @@
 
 using json = nlohmann::json;
 
-namespace clientmonitor
+namespace observertc::clientmonitor
 {
 	namespace libwebrtc
 	{
@@ -481,4 +481,4 @@ namespace clientmonitor
 			return "unknown";
 		}
 	} // namespace libwebrtc
-} // namespace clientmonitor
+} // namespace observertc::clientmonitor

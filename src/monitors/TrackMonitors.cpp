@@ -13,7 +13,7 @@
 
 #include <cmath>
 
-namespace clientmonitor
+namespace observertc::clientmonitor
 {
 	namespace
 	{
@@ -393,4 +393,4 @@ namespace clientmonitor
 		  !current.has_value() || previous->frameRate != current->frameRate ||
 		  previous->width != current->width || previous->height != current->height;
 	}
-} // namespace clientmonitor
+} // namespace observertc::clientmonitor

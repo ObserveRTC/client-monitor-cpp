@@ -4,7 +4,7 @@
 
 #include <iostream>
 
-namespace clientmonitor
+namespace observertc::clientmonitor
 {
 	/* Class variables. */
 
@@ -38,4 +38,4 @@ namespace clientmonitor
 	{
 		std::cout << payload << std::endl;
 	}
-} // namespace clientmonitor
+} // namespace observertc::clientmonitor

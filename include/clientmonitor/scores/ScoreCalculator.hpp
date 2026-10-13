@@ -1,7 +1,7 @@
 #ifndef CM_SCORES_SCORE_CALCULATOR_HPP
 #define CM_SCORES_SCORE_CALCULATOR_HPP
 
-namespace clientmonitor
+namespace observertc::clientmonitor
 {
 	// Fast forward declarations.
 	class ClientMonitor;
@@ -20,6 +20,6 @@ namespace clientmonitor
 		virtual ~ScoreCalculator()                  = default;
 		virtual void Update(ClientMonitor* monitor) = 0;
 	};
-} // namespace clientmonitor
+} // namespace observertc::clientmonitor
 
 #endif

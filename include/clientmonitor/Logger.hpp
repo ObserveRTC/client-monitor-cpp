@@ -26,7 +26,7 @@
 #include <cstring>
 #include <mutex>
 
-namespace clientmonitor
+namespace observertc::clientmonitor
 {
 	class Logger
 	{
@@ -64,7 +64,7 @@ namespace clientmonitor
 		// The collecting timer runs on its own thread, so the shared buffer is guarded.
 		static std::mutex mutex;
 	};
-} // namespace clientmonitor
+} // namespace observertc::clientmonitor
 
 // clang-format off
 
@@ -89,18 +89,18 @@ namespace clientmonitor
 #define _CM_LOG(level, tag, ...) \
 	do \
 	{ \
-		if (clientmonitor::Logger::handler && clientmonitor::Logger::logLevel >= clientmonitor::Logger::LogLevel::level) \
+		if (observertc::clientmonitor::Logger::handler && observertc::clientmonitor::Logger::logLevel >= observertc::clientmonitor::Logger::LogLevel::level) \
 		{ \
-			std::lock_guard<std::mutex> loggerLock(clientmonitor::Logger::mutex); \
-			int loggerWritten = std::snprintf(clientmonitor::Logger::buffer, clientmonitor::Logger::BufferSize, "[" tag "]" _CM_LOG_STR_DESC, _CM_LOG_ARG); \
+			std::lock_guard<std::mutex> loggerLock(observertc::clientmonitor::Logger::mutex); \
+			int loggerWritten = std::snprintf(observertc::clientmonitor::Logger::buffer, observertc::clientmonitor::Logger::BufferSize, "[" tag "]" _CM_LOG_STR_DESC, _CM_LOG_ARG); \
 			if (loggerWritten < 0) loggerWritten = 0; \
-			if (static_cast<size_t>(loggerWritten) < clientmonitor::Logger::BufferSize) \
+			if (static_cast<size_t>(loggerWritten) < observertc::clientmonitor::Logger::BufferSize) \
 			{ \
-				const int loggerAppended = std::snprintf(clientmonitor::Logger::buffer + loggerWritten, clientmonitor::Logger::BufferSize - static_cast<size_t>(loggerWritten), __VA_ARGS__); \
+				const int loggerAppended = std::snprintf(observertc::clientmonitor::Logger::buffer + loggerWritten, observertc::clientmonitor::Logger::BufferSize - static_cast<size_t>(loggerWritten), __VA_ARGS__); \
 				if (loggerAppended > 0) loggerWritten += loggerAppended; \
 			} \
-			if (static_cast<size_t>(loggerWritten) >= clientmonitor::Logger::BufferSize) loggerWritten = clientmonitor::Logger::BufferSize - 1; \
-			clientmonitor::Logger::handler->OnLog(clientmonitor::Logger::LogLevel::level, clientmonitor::Logger::buffer, static_cast<size_t>(loggerWritten)); \
+			if (static_cast<size_t>(loggerWritten) >= observertc::clientmonitor::Logger::BufferSize) loggerWritten = observertc::clientmonitor::Logger::BufferSize - 1; \
+			observertc::clientmonitor::Logger::handler->OnLog(observertc::clientmonitor::Logger::LogLevel::level, observertc::clientmonitor::Logger::buffer, static_cast<size_t>(loggerWritten)); \
 		} \
 	} \
 	while (false)
@@ -110,11 +110,11 @@ namespace clientmonitor
 	#define CM_TRACE() \
 		do \
 		{ \
-			if (clientmonitor::Logger::handler && clientmonitor::Logger::logLevel == clientmonitor::Logger::LogLevel::LOG_TRACE) \
+			if (observertc::clientmonitor::Logger::handler && observertc::clientmonitor::Logger::logLevel == observertc::clientmonitor::Logger::LogLevel::LOG_TRACE) \
 			{ \
-				std::lock_guard<std::mutex> loggerLock(clientmonitor::Logger::mutex); \
-				int loggerWritten = std::snprintf(clientmonitor::Logger::buffer, clientmonitor::Logger::BufferSize, "[TRACE]" _CM_LOG_STR, _CM_LOG_ARG); \
-				clientmonitor::Logger::handler->OnLog(clientmonitor::Logger::LogLevel::LOG_TRACE, clientmonitor::Logger::buffer, loggerWritten); \
+				std::lock_guard<std::mutex> loggerLock(observertc::clientmonitor::Logger::mutex); \
+				int loggerWritten = std::snprintf(observertc::clientmonitor::Logger::buffer, observertc::clientmonitor::Logger::BufferSize, "[TRACE]" _CM_LOG_STR, _CM_LOG_ARG); \
+				observertc::clientmonitor::Logger::handler->OnLog(observertc::clientmonitor::Logger::LogLevel::LOG_TRACE, observertc::clientmonitor::Logger::buffer, loggerWritten); \
 			} \
 		} \
 		while (false)

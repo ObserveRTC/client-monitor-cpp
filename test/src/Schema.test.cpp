@@ -3,7 +3,7 @@
 #include <catch.hpp>
 
 using json = nlohmann::json;
-using namespace clientmonitor;
+using namespace observertc::clientmonitor;
 
 TEST_CASE("schema", "[schema]")
 {

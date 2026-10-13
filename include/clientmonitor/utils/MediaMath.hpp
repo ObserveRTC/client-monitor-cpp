@@ -5,7 +5,7 @@
 #include <optional>
 #include <string>
 
-namespace clientmonitor
+namespace observertc::clientmonitor
 {
 	namespace utils
 	{
@@ -32,6 +32,6 @@ namespace clientmonitor
 		std::optional<std::map<std::string, double>> SampledScoreReasons(
 		  const std::map<std::string, double>& reasons, bool sendScoreReasonsToServer);
 	} // namespace utils
-} // namespace clientmonitor
+} // namespace observertc::clientmonitor
 
 #endif

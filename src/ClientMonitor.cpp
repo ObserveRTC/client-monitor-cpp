@@ -12,7 +12,7 @@
 
 using json = nlohmann::json;
 
-namespace clientmonitor
+namespace observertc::clientmonitor
 {
 	ClientMonitor::ClientMonitor(const ClientMonitorConfig& config, Listener* listener)
 	  : config(config), createdAt(utils::NowMs()), activeIssues(this)
@@ -1218,4 +1218,4 @@ namespace clientmonitor
 	{
 		this->AddIssue(issue.type, issue.payload, issue.timestamp, issue.includeInSample.value_or(true));
 	}
-} // namespace clientmonitor
+} // namespace observertc::clientmonitor

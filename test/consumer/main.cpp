@@ -5,14 +5,14 @@
 
 int main()
 {
-	clientmonitor::ClientMonitorConfig config;
+	observertc::clientmonitor::ClientMonitorConfig config;
 
 	config.collectingPeriodInMs = 0;
 
-	clientmonitor::ClientMonitor monitor(config);
+	observertc::clientmonitor::ClientMonitor monitor(config);
 	auto sample = monitor.CreateSample();
 
-	std::cout << "client-monitor-cpp " << clientmonitor::Version << ", schema "
+	std::cout << "client-monitor-cpp " << observertc::clientmonitor::Version << ", schema "
 	          << observertc::schemas::SchemaVersion << ": " << sample->ToJson().dump() << std::endl;
 
 	return sample.has_value() ? 0 : 1;

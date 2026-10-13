@@ -6,7 +6,7 @@
 #include <functional>
 #include <string>
 
-namespace clientmonitor
+namespace observertc::clientmonitor
 {
 	/**
 	 * Where a PeerConnectionMonitor gets its W3C stats from on every collection.
@@ -65,6 +65,6 @@ namespace clientmonitor
 		const std::string& GetName() const override;
 		void Adapt(nlohmann::json& stats) override;
 	};
-} // namespace clientmonitor
+} // namespace observertc::clientmonitor
 
 #endif

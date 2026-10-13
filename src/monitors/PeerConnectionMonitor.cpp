@@ -14,9 +14,9 @@
 #include <initializer_list>
 
 using json = nlohmann::json;
-using clientmonitor::utils::AccumulatedValue;
+using observertc::clientmonitor::utils::AccumulatedValue;
 
-namespace clientmonitor
+namespace observertc::clientmonitor
 {
 	namespace
 	{
@@ -1925,4 +1925,4 @@ namespace clientmonitor
 			it = this->outboundTracks.erase(it);
 		}
 	}
-} // namespace clientmonitor
+} // namespace observertc::clientmonitor

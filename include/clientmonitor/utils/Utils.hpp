@@ -7,7 +7,7 @@
 #include <optional>
 #include <string>
 
-namespace clientmonitor
+namespace observertc::clientmonitor
 {
 	namespace utils
 	{
@@ -78,6 +78,6 @@ namespace clientmonitor
 			return std::min(max, std::max(min, value));
 		}
 	} // namespace utils
-} // namespace clientmonitor
+} // namespace observertc::clientmonitor
 
 #endif

@@ -20,7 +20,7 @@
 #include <string>
 #include <vector>
 
-namespace clientmonitor
+namespace observertc::clientmonitor
 {
 	// Fast forward declarations.
 	class ClientMonitor;
@@ -368,6 +368,6 @@ namespace clientmonitor
 		std::map<std::string, std::unique_ptr<InboundTrackMonitor>> inboundTracks;
 		std::map<std::string, std::unique_ptr<OutboundTrackMonitor>> outboundTracks;
 	};
-} // namespace clientmonitor
+} // namespace observertc::clientmonitor
 
 #endif

@@ -25,7 +25,7 @@
 #include <utility>
 #include <vector>
 
-namespace clientmonitor
+namespace observertc::clientmonitor
 {
 	/**
 	 * Monitors one WebRTC client: the peer connections it holds, the issues detected on them, and
@@ -475,6 +475,6 @@ namespace clientmonitor
 		std::unique_ptr<ScoreCalculator> scoreCalculator;
 		Detectors detectors;
 	};
-} // namespace clientmonitor
+} // namespace observertc::clientmonitor
 
 #endif

@@ -7,7 +7,7 @@
 #include <optional>
 #include <string>
 
-namespace clientmonitor
+namespace observertc::clientmonitor
 {
 	/**
 	 * One-shot issue, produced by ClientMonitor::AddIssue(). Reported to OnIssue() and buffered
@@ -88,6 +88,6 @@ namespace clientmonitor
 
 		return result;
 	}
-} // namespace clientmonitor
+} // namespace observertc::clientmonitor
 
 #endif

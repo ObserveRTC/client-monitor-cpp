@@ -6,7 +6,7 @@
 #include <string>
 #include <vector>
 
-namespace clientmonitor
+namespace observertc::clientmonitor
 {
 	/**
 	 * A detector reaches one verdict about one subject (the client, a peer connection, a track,
@@ -75,6 +75,6 @@ namespace clientmonitor
 	private:
 		std::vector<std::unique_ptr<Detector>> detectors;
 	};
-} // namespace clientmonitor
+} // namespace observertc::clientmonitor
 
 #endif

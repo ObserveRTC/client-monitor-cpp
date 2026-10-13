@@ -15,7 +15,7 @@
 #include <string>
 #include <vector>
 
-namespace clientmonitor
+namespace observertc::clientmonitor
 {
 	// Fast forward declarations.
 	class InboundRtpMonitor;
@@ -425,6 +425,6 @@ namespace clientmonitor
 		std::unique_ptr<SlicedWindow> slicedWindow;
 		Detectors detectors;
 	};
-} // namespace clientmonitor
+} // namespace observertc::clientmonitor
 
 #endif

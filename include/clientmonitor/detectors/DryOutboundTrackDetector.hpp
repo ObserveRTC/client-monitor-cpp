@@ -6,7 +6,7 @@
 #include <optional>
 #include <string>
 
-namespace clientmonitor
+namespace observertc::clientmonitor
 {
 	// Fast forward declarations.
 	class OutboundTrackMonitor;
@@ -39,6 +39,6 @@ namespace clientmonitor
 		std::optional<int64_t> startedDryAt;
 		double dryForInMs{ 0 };
 	};
-} // namespace clientmonitor
+} // namespace observertc::clientmonitor
 
 #endif

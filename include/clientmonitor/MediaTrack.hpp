@@ -4,7 +4,7 @@
 #include <optional>
 #include <string>
 
-namespace clientmonitor
+namespace observertc::clientmonitor
 {
 	/**
 	 * What the monitor needs to know about a media track. The JS library reads a browser
@@ -126,6 +126,6 @@ namespace clientmonitor
 		bool enabled{ true };
 		std::optional<Settings> settings;
 	};
-} // namespace clientmonitor
+} // namespace observertc::clientmonitor
 
 #endif

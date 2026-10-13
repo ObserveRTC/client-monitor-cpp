@@ -22,7 +22,7 @@
 #include <memory>
 #include <string>
 
-namespace clientmonitor
+namespace observertc::clientmonitor
 {
 	namespace libwebrtc
 	{
@@ -135,6 +135,6 @@ namespace clientmonitor
 		const char* ToString(webrtc::PeerConnectionInterface::IceGatheringState state);
 		const char* ToString(webrtc::PeerConnectionInterface::SignalingState state);
 	} // namespace libwebrtc
-} // namespace clientmonitor
+} // namespace observertc::clientmonitor
 
 #endif

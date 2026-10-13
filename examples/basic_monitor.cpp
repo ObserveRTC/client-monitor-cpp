@@ -14,18 +14,18 @@
 
 using json = nlohmann::json;
 
-class PrintingListener : public clientmonitor::ClientMonitor::Listener
+class PrintingListener : public observertc::clientmonitor::ClientMonitor::Listener
 {
 public:
 	void OnSampleCreated(
-	  clientmonitor::ClientMonitor* /*monitor*/, const clientmonitor::ClientSample& sample) override
+	  observertc::clientmonitor::ClientMonitor* /*monitor*/, const observertc::clientmonitor::ClientSample& sample) override
 	{
 		// This is what goes to the observer.
 		std::cout << "sample: " << sample.ToJson().dump() << std::endl;
 	}
 
 	void OnIssue(
-	  clientmonitor::ClientMonitor* /*monitor*/, const clientmonitor::ReportedClientIssue& issue) override
+	  observertc::clientmonitor::ClientMonitor* /*monitor*/, const observertc::clientmonitor::ReportedClientIssue& issue) override
 	{
 		std::cout << "issue: " << issue.type << " " << issue.payload.dump() << std::endl;
 	}
@@ -33,12 +33,12 @@ public:
 
 int main()
 {
-	clientmonitor::Logger::SetLogLevel(clientmonitor::Logger::LogLevel::LOG_WARN);
-	clientmonitor::Logger::SetDefaultHandler();
+	observertc::clientmonitor::Logger::SetLogLevel(observertc::clientmonitor::Logger::LogLevel::LOG_WARN);
+	observertc::clientmonitor::Logger::SetDefaultHandler();
 
-	std::cout << "client-monitor-cpp " << clientmonitor::Version << std::endl;
+	std::cout << "client-monitor-cpp " << observertc::clientmonitor::Version << std::endl;
 
-	clientmonitor::ClientMonitorConfig config;
+	observertc::clientmonitor::ClientMonitorConfig config;
 
 	config.clientId             = "client-1";
 	config.callId               = "call-1";
@@ -46,12 +46,12 @@ int main()
 	config.samplingPeriodInMs   = 1;
 
 	PrintingListener listener;
-	clientmonitor::ClientMonitor monitor(config, &listener);
+	observertc::clientmonitor::ClientMonitor monitor(config, &listener);
 
 	double timestamp{ 1000 };
 	int64_t bytes{ 0 };
 
-	auto collector = std::make_shared<clientmonitor::FunctionStatsCollector>(
+	auto collector = std::make_shared<observertc::clientmonitor::FunctionStatsCollector>(
 	  [&]()
 	  {
 		  timestamp += 1000;
@@ -72,7 +72,7 @@ int main()
 	auto* peerConnection = monitor.AddPeerConnection(collector, "pc-1");
 
 	peerConnection->AddMediaTrack(
-	  std::make_shared<clientmonitor::BasicMediaTrack>("remote-audio", "audio"));
+	  std::make_shared<observertc::clientmonitor::BasicMediaTrack>("remote-audio", "audio"));
 
 	for (int i = 0; i < 3; ++i)
 	{

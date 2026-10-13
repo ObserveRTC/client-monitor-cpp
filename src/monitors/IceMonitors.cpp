@@ -9,9 +9,9 @@
 
 #include <regex>
 
-using clientmonitor::utils::PositiveDelta;
+using observertc::clientmonitor::utils::PositiveDelta;
 
-namespace clientmonitor
+namespace observertc::clientmonitor
 {
 	/* IceTransportMonitor */
 
@@ -362,4 +362,4 @@ namespace clientmonitor
 		return address(local) + ":" + port(local) + ":" + address(remote) + ":" + port(remote) + ":" +
 		       protocol;
 	}
-} // namespace clientmonitor
+} // namespace observertc::clientmonitor

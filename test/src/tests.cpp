@@ -6,8 +6,8 @@
 
 int main(int argc, char* argv[])
 {
-	clientmonitor::Logger::SetLogLevel(clientmonitor::Logger::LogLevel::LOG_ERROR);
-	clientmonitor::Logger::SetDefaultHandler();
+	observertc::clientmonitor::Logger::SetLogLevel(observertc::clientmonitor::Logger::LogLevel::LOG_ERROR);
+	observertc::clientmonitor::Logger::SetDefaultHandler();
 
 	return Catch::Session().run(argc, argv);
 }

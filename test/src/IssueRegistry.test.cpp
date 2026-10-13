@@ -2,7 +2,7 @@
 
 #include <catch.hpp>
 
-using namespace clientmonitor;
+using namespace observertc::clientmonitor;
 
 namespace
 {

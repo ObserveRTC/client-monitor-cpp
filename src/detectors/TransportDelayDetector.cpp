@@ -6,7 +6,7 @@
 #include "clientmonitor/Logger.hpp"
 #include "clientmonitor/monitors/PeerConnectionMonitor.hpp"
 
-namespace clientmonitor
+namespace observertc::clientmonitor
 {
 	TransportDelayDetector::TransportDelayDetector(PeerConnectionMonitor* peerConnection)
 	  : peerConnection(peerConnection),
@@ -183,4 +183,4 @@ namespace clientmonitor
 
 		this->startedAt.reset();
 	}
-} // namespace clientmonitor
+} // namespace observertc::clientmonitor

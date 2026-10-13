@@ -8,9 +8,9 @@
 
 #include <cmath>
 
-using clientmonitor::utils::PositiveDelta;
+using observertc::clientmonitor::utils::PositiveDelta;
 
-namespace clientmonitor
+namespace observertc::clientmonitor
 {
 	/* CodecMonitor */
 
@@ -200,4 +200,4 @@ namespace clientmonitor
 
 		this->stats = next;
 	}
-} // namespace clientmonitor
+} // namespace observertc::clientmonitor

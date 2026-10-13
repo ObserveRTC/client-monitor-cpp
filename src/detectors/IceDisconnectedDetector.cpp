@@ -8,7 +8,7 @@
 
 #include <set>
 
-namespace clientmonitor
+namespace observertc::clientmonitor
 {
 	IceDisconnectedDetector::IceDisconnectedDetector(PeerConnectionMonitor* peerConnection)
 	  : peerConnection(peerConnection)
@@ -192,4 +192,4 @@ namespace clientmonitor
 		return std::string(IssueType) + "-pc-" + this->peerConnection->GetPeerConnectionId() +
 		       "-transport-" + transportId;
 	}
-} // namespace clientmonitor
+} // namespace observertc::clientmonitor

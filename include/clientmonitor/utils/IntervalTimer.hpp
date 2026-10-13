@@ -8,7 +8,7 @@
 #include <mutex>
 #include <thread>
 
-namespace clientmonitor
+namespace observertc::clientmonitor
 {
 	/**
 	 * Runs a callback every `periodInMs` on its own thread (the JS `setInterval`).
@@ -43,6 +43,6 @@ namespace clientmonitor
 		std::shared_ptr<State> state;
 		std::thread thread;
 	};
-} // namespace clientmonitor
+} // namespace observertc::clientmonitor
 
 #endif

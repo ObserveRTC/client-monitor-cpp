@@ -11,7 +11,7 @@
 #include <string>
 #include <vector>
 
-namespace clientmonitor
+namespace observertc::clientmonitor
 {
 	/**
 	 * Where an IssueRegistry reports what happened to its issues. Every registry is itself a sink,
@@ -107,6 +107,6 @@ namespace clientmonitor
 		std::vector<std::string> order;
 		std::map<std::string, RaisedClientIssue> activeIssues;
 	};
-} // namespace clientmonitor
+} // namespace observertc::clientmonitor
 
 #endif

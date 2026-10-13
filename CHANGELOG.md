@@ -5,6 +5,8 @@ the version lives in `project(... VERSION ...)` in `CMakeLists.txt` and is tagge
 
 ## Unreleased
 
+- **Breaking:** the library moved from `clientmonitor` to `observertc::clientmonitor`, alongside
+  the generated `observertc::schemas`. Include paths and the CMake target are unchanged.
 - `docs/USAGE.md`: a recipe for every public API, and `examples/api_tour.cpp`, which compiles and
   runs all of them in CI.
 - Logging macros no longer use the GNU `##__VA_ARGS__` extension, so Clang with `-Wpedantic`

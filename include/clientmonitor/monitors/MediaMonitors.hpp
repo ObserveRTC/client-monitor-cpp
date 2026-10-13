@@ -8,7 +8,7 @@
 #include <optional>
 #include <vector>
 
-namespace clientmonitor
+namespace observertc::clientmonitor
 {
 	// Fast forward declarations.
 	class IceTransportMonitor;
@@ -137,6 +137,6 @@ namespace clientmonitor
 	public:
 		void Accept(const CertificateStats& stats);
 	};
-} // namespace clientmonitor
+} // namespace observertc::clientmonitor
 
 #endif

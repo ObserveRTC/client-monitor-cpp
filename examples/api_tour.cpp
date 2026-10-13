@@ -15,27 +15,27 @@ using json = nlohmann::json;
 
 /* Listener: what the application hears back. */
 
-class AppListener : public clientmonitor::ClientMonitor::Listener
+class AppListener : public observertc::clientmonitor::ClientMonitor::Listener
 {
 public:
-	void OnSampleCreated(clientmonitor::ClientMonitor* /*monitor*/, const clientmonitor::ClientSample& sample) override
+	void OnSampleCreated(observertc::clientmonitor::ClientMonitor* /*monitor*/, const observertc::clientmonitor::ClientSample& sample) override
 	{
 		// Queue it for your network thread; do not send it from here.
 		lastSample = sample.ToJson().dump();
 	}
 
-	void OnIssue(clientmonitor::ClientMonitor* /*monitor*/, const clientmonitor::ReportedClientIssue& issue) override
+	void OnIssue(observertc::clientmonitor::ClientMonitor* /*monitor*/, const observertc::clientmonitor::ReportedClientIssue& issue) override
 	{
 		std::cout << "issue " << issue.type << (issue.resolvable ? " (raised, key " + issue.key + ")" : "")
 		          << " " << issue.payload.dump() << std::endl;
 	}
 
-	void OnIssueResolved(clientmonitor::ClientMonitor* /*monitor*/, const clientmonitor::ResolvedClientIssue& issue) override
+	void OnIssueResolved(observertc::clientmonitor::ClientMonitor* /*monitor*/, const observertc::clientmonitor::ResolvedClientIssue& issue) override
 	{
 		std::cout << "resolved " << issue.key << ": " << issue.comment.value_or("") << std::endl;
 	}
 
-	void OnClientEvent(clientmonitor::ClientMonitor* /*monitor*/, const clientmonitor::ClientEvent& event) override
+	void OnClientEvent(observertc::clientmonitor::ClientMonitor* /*monitor*/, const observertc::clientmonitor::ClientEvent& event) override
 	{
 		std::cout << "event " << event.type << std::endl;
 	}
@@ -45,12 +45,12 @@ public:
 
 int main()
 {
-	clientmonitor::Logger::SetDefaultHandler();
-	clientmonitor::Logger::SetLogLevel(clientmonitor::Logger::LogLevel::LOG_WARN);
+	observertc::clientmonitor::Logger::SetDefaultHandler();
+	observertc::clientmonitor::Logger::SetLogLevel(observertc::clientmonitor::Logger::LogLevel::LOG_WARN);
 
 	/* Create a monitor. */
 
-	clientmonitor::ClientMonitorConfig config;
+	observertc::clientmonitor::ClientMonitorConfig config;
 
 	config.clientId             = "client-1";
 	config.callId               = "call-1";
@@ -58,7 +58,7 @@ int main()
 	config.samplingPeriodInMs   = 5000;
 
 	AppListener listener;
-	clientmonitor::ClientMonitor monitor(config, &listener);
+	observertc::clientmonitor::ClientMonitor monitor(config, &listener);
 
 	monitor.SetAttachments({ { "roomId", "room-42" }, { "userId", "user-7" } });
 
@@ -69,14 +69,14 @@ int main()
 
 	// One of the library's own event types, with an explicit timestamp (epoch milliseconds).
 	monitor.AddEvent(
-	  clientmonitor::ClientEventTypes::MEDIA_TRACK_MUTED,
+	  observertc::clientmonitor::ClientEventTypes::MEDIA_TRACK_MUTED,
 	  { { "trackId", "local-audio" }, { "reason", "user" } },
 	  1700000000000);
 
 	/* Meta data. */
 
 	monitor.AddMetaData(
-	  clientmonitor::ClientMetaTypes::OPERATION_SYSTEM, { { "name", "macOS" }, { "version", "15.1" } });
+	  observertc::clientmonitor::ClientMetaTypes::OPERATION_SYSTEM, { { "name", "macOS" }, { "version", "15.1" } });
 
 	/* One-shot issues. */
 
@@ -123,9 +123,9 @@ int main()
 	// A provider runs on every collection, so its value stays readable for the whole call.
 	int cpuReading{ 40 };
 	const auto providerHandle = monitor.AddExtensionStatsProvider(
-	  [&cpuReading]() -> std::optional<clientmonitor::ClientMonitor::ExtensionStatsInput>
+	  [&cpuReading]() -> std::optional<observertc::clientmonitor::ClientMonitor::ExtensionStatsInput>
 	  {
-		  return clientmonitor::ClientMonitor::ExtensionStatsInput{
+		  return observertc::clientmonitor::ClientMonitor::ExtensionStatsInput{
 			  "system-metrics", { { "cpu", cpuReading } }, std::string("system")
 		  };
 	  });
@@ -135,7 +135,7 @@ int main()
 	double timestamp{ 1000 };
 	int64_t bytes{ 0 };
 
-	auto collector = std::make_shared<clientmonitor::FunctionStatsCollector>(
+	auto collector = std::make_shared<observertc::clientmonitor::FunctionStatsCollector>(
 	  [&]()
 	  {
 		  timestamp += 1000;
@@ -156,11 +156,11 @@ int main()
 	auto* peerConnection = monitor.AddPeerConnection(collector, "pc-1", { { "role", "recv" } });
 
 	peerConnection->AddMediaTrack(
-	  std::make_shared<clientmonitor::BasicMediaTrack>("remote-audio", "audio"), { { "participant", "alice" } });
+	  std::make_shared<observertc::clientmonitor::BasicMediaTrack>("remote-audio", "audio"), { { "participant", "alice" } });
 
 	/* Track context: what the stats cannot show. Declarable before the track appears. */
 
-	clientmonitor::InboundTrackContext context;
+	observertc::clientmonitor::InboundTrackContext context;
 
 	context.paused = true; // e.g. a mediasoup consumer created paused
 	monitor.SetInboundTrackContext("remote-audio", context);

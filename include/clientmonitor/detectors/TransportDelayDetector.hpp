@@ -7,7 +7,7 @@
 #include <optional>
 #include <string>
 
-namespace clientmonitor
+namespace observertc::clientmonitor
 {
 	// Fast forward declarations.
 	class PeerConnectionMonitor;
@@ -54,6 +54,6 @@ namespace clientmonitor
 		bool inputsUnavailable{ false };
 		std::optional<int64_t> startedAt;
 	};
-} // namespace clientmonitor
+} // namespace observertc::clientmonitor
 
 #endif

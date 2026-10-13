@@ -5,7 +5,7 @@
 #include "clientmonitor/Logger.hpp"
 #include "clientmonitor/schema/ClientEventTypes.hpp"
 
-namespace clientmonitor
+namespace observertc::clientmonitor
 {
 	StatsGapDetector::StatsGapDetector(ClientMonitor* clientMonitor) : clientMonitor(clientMonitor)
 	{
@@ -95,4 +95,4 @@ namespace clientmonitor
          this->clientMonitor->GetMetrics().durationOfCollectingStatsInMs },
     });
 	}
-} // namespace clientmonitor
+} // namespace observertc::clientmonitor

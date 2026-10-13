@@ -5,7 +5,7 @@
 #include <cctype>
 #include <vector>
 
-namespace clientmonitor
+namespace observertc::clientmonitor
 {
 	namespace utils
 	{
@@ -125,4 +125,4 @@ namespace clientmonitor
 			return reasons;
 		}
 	} // namespace utils
-} // namespace clientmonitor
+} // namespace observertc::clientmonitor

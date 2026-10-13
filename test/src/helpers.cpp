@@ -9,7 +9,7 @@ namespace helpers
 	{
 		auto now = this->now;
 
-		clientmonitor::utils::SetClock(
+		observertc::clientmonitor::utils::SetClock(
 		  [now]()
 		  {
 			  return *now;
@@ -18,7 +18,7 @@ namespace helpers
 
 	FakeClock::~FakeClock()
 	{
-		clientmonitor::utils::SetClock(nullptr);
+		observertc::clientmonitor::utils::SetClock(nullptr);
 	}
 
 	int64_t FakeClock::Now() const
@@ -38,9 +38,9 @@ namespace helpers
 		return this->next;
 	}
 
-	clientmonitor::ClientMonitorConfig ManualConfig()
+	observertc::clientmonitor::ClientMonitorConfig ManualConfig()
 	{
-		clientmonitor::ClientMonitorConfig config;
+		observertc::clientmonitor::ClientMonitorConfig config;
 
 		config.collectingPeriodInMs = 0;
 		config.samplingPeriodInMs   = 1000;
@@ -151,78 +151,78 @@ namespace helpers
 	/* RecordingListener */
 
 	void RecordingListener::OnSampleCreated(
-	  clientmonitor::ClientMonitor*, const clientmonitor::ClientSample& sample)
+	  observertc::clientmonitor::ClientMonitor*, const observertc::clientmonitor::ClientSample& sample)
 	{
 		this->samples.push_back(sample);
 	}
 
 	void RecordingListener::OnIssue(
-	  clientmonitor::ClientMonitor*, const clientmonitor::ReportedClientIssue& issue)
+	  observertc::clientmonitor::ClientMonitor*, const observertc::clientmonitor::ReportedClientIssue& issue)
 	{
 		this->issues.push_back(issue);
 	}
 
 	void RecordingListener::OnIssueUpdated(
-	  clientmonitor::ClientMonitor*, const clientmonitor::RaisedClientIssue& issue)
+	  observertc::clientmonitor::ClientMonitor*, const observertc::clientmonitor::RaisedClientIssue& issue)
 	{
 		this->updatedIssues.push_back(issue);
 	}
 
 	void RecordingListener::OnIssueResolved(
-	  clientmonitor::ClientMonitor*, const clientmonitor::ResolvedClientIssue& issue)
+	  observertc::clientmonitor::ClientMonitor*, const observertc::clientmonitor::ResolvedClientIssue& issue)
 	{
 		this->resolvedIssues.push_back(issue);
 	}
 
 	void RecordingListener::OnClientEvent(
-	  clientmonitor::ClientMonitor*, const clientmonitor::ClientEvent& event)
+	  observertc::clientmonitor::ClientMonitor*, const observertc::clientmonitor::ClientEvent& event)
 	{
 		this->events.push_back(event);
 	}
 
-	void RecordingListener::OnClose(clientmonitor::ClientMonitor*)
+	void RecordingListener::OnClose(observertc::clientmonitor::ClientMonitor*)
 	{
 		++this->closed;
 	}
 
 	void RecordingListener::OnStatsCollectionGap(
-	  clientmonitor::ClientMonitor*, const StatsCollectionGapEvent& event)
+	  observertc::clientmonitor::ClientMonitor*, const StatsCollectionGapEvent& event)
 	{
 		this->gaps.push_back(event);
 	}
 
 	void RecordingListener::OnDryInboundTrack(
-	  clientmonitor::ClientMonitor*, clientmonitor::InboundTrackMonitor*)
+	  observertc::clientmonitor::ClientMonitor*, observertc::clientmonitor::InboundTrackMonitor*)
 	{
 		++this->dryInbound;
 	}
 
 	void RecordingListener::OnDryOutboundTrack(
-	  clientmonitor::ClientMonitor*, clientmonitor::OutboundTrackMonitor*)
+	  observertc::clientmonitor::ClientMonitor*, observertc::clientmonitor::OutboundTrackMonitor*)
 	{
 		++this->dryOutbound;
 	}
 
 	void RecordingListener::OnTransportDelayDegraded(
-	  clientmonitor::ClientMonitor*, clientmonitor::PeerConnectionMonitor*, double)
+	  observertc::clientmonitor::ClientMonitor*, observertc::clientmonitor::PeerConnectionMonitor*, double)
 	{
 		++this->transportDelay;
 	}
 
 	void RecordingListener::OnNewPeerConnectionMonitor(
-	  clientmonitor::ClientMonitor*, clientmonitor::PeerConnectionMonitor*)
+	  observertc::clientmonitor::ClientMonitor*, observertc::clientmonitor::PeerConnectionMonitor*)
 	{
 		++this->newPeerConnections;
 	}
 
 	void RecordingListener::OnNewInboundTrackMonitor(
-	  clientmonitor::ClientMonitor*, clientmonitor::InboundTrackMonitor*)
+	  observertc::clientmonitor::ClientMonitor*, observertc::clientmonitor::InboundTrackMonitor*)
 	{
 		++this->newInboundTracks;
 	}
 
 	void RecordingListener::OnNewOutboundTrackMonitor(
-	  clientmonitor::ClientMonitor*, clientmonitor::OutboundTrackMonitor*)
+	  observertc::clientmonitor::ClientMonitor*, observertc::clientmonitor::OutboundTrackMonitor*)
 	{
 		++this->newOutboundTracks;
 	}

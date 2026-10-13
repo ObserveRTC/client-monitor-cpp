@@ -4,7 +4,7 @@
 
 #include <stdexcept>
 
-using namespace clientmonitor;
+using namespace observertc::clientmonitor;
 
 namespace
 {

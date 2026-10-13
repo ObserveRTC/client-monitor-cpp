@@ -7,7 +7,7 @@
 #include "clientmonitor/monitors/PeerConnectionMonitor.hpp"
 #include "clientmonitor/monitors/TrackMonitors.hpp"
 
-namespace clientmonitor
+namespace observertc::clientmonitor
 {
 	DryInboundTrackDetector::DryInboundTrackDetector(InboundTrackMonitor* trackMonitor)
 	  : trackMonitor(trackMonitor),
@@ -149,4 +149,4 @@ namespace clientmonitor
 
 		this->startedDryAt.reset();
 	}
-} // namespace clientmonitor
+} // namespace observertc::clientmonitor

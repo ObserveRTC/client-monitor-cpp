@@ -28,7 +28,7 @@ namespace helpers
 	};
 
 	/** A StatsCollector whose next report the test sets. */
-	class ScriptedStatsCollector : public clientmonitor::StatsCollector
+	class ScriptedStatsCollector : public observertc::clientmonitor::StatsCollector
 	{
 	public:
 		nlohmann::json GetStats() override;
@@ -38,7 +38,7 @@ namespace helpers
 	};
 
 	/** Config for deterministic tests: no timer, every Collect() samples. */
-	clientmonitor::ClientMonitorConfig ManualConfig();
+	observertc::clientmonitor::ClientMonitorConfig ManualConfig();
 
 	/** A media-flowing report: one audio in, one video out, one transport, one selected pair. */
 	struct Counters
@@ -61,34 +61,34 @@ namespace helpers
 	nlohmann::json BuildReport(const Counters& c);
 
 	/** Records every listener call it cares about. */
-	class RecordingListener : public clientmonitor::ClientMonitor::Listener
+	class RecordingListener : public observertc::clientmonitor::ClientMonitor::Listener
 	{
 	public:
-		void OnSampleCreated(clientmonitor::ClientMonitor*, const clientmonitor::ClientSample& sample) override;
-		void OnIssue(clientmonitor::ClientMonitor*, const clientmonitor::ReportedClientIssue& issue) override;
+		void OnSampleCreated(observertc::clientmonitor::ClientMonitor*, const observertc::clientmonitor::ClientSample& sample) override;
+		void OnIssue(observertc::clientmonitor::ClientMonitor*, const observertc::clientmonitor::ReportedClientIssue& issue) override;
 		void OnIssueUpdated(
-		  clientmonitor::ClientMonitor*, const clientmonitor::RaisedClientIssue& issue) override;
+		  observertc::clientmonitor::ClientMonitor*, const observertc::clientmonitor::RaisedClientIssue& issue) override;
 		void OnIssueResolved(
-		  clientmonitor::ClientMonitor*, const clientmonitor::ResolvedClientIssue& issue) override;
-		void OnClientEvent(clientmonitor::ClientMonitor*, const clientmonitor::ClientEvent& event) override;
-		void OnClose(clientmonitor::ClientMonitor*) override;
-		void OnStatsCollectionGap(clientmonitor::ClientMonitor*, const StatsCollectionGapEvent& event) override;
-		void OnDryInboundTrack(clientmonitor::ClientMonitor*, clientmonitor::InboundTrackMonitor*) override;
-		void OnDryOutboundTrack(clientmonitor::ClientMonitor*, clientmonitor::OutboundTrackMonitor*) override;
+		  observertc::clientmonitor::ClientMonitor*, const observertc::clientmonitor::ResolvedClientIssue& issue) override;
+		void OnClientEvent(observertc::clientmonitor::ClientMonitor*, const observertc::clientmonitor::ClientEvent& event) override;
+		void OnClose(observertc::clientmonitor::ClientMonitor*) override;
+		void OnStatsCollectionGap(observertc::clientmonitor::ClientMonitor*, const StatsCollectionGapEvent& event) override;
+		void OnDryInboundTrack(observertc::clientmonitor::ClientMonitor*, observertc::clientmonitor::InboundTrackMonitor*) override;
+		void OnDryOutboundTrack(observertc::clientmonitor::ClientMonitor*, observertc::clientmonitor::OutboundTrackMonitor*) override;
 		void OnTransportDelayDegraded(
-		  clientmonitor::ClientMonitor*, clientmonitor::PeerConnectionMonitor*, double) override;
+		  observertc::clientmonitor::ClientMonitor*, observertc::clientmonitor::PeerConnectionMonitor*, double) override;
 		void OnNewPeerConnectionMonitor(
-		  clientmonitor::ClientMonitor*, clientmonitor::PeerConnectionMonitor*) override;
+		  observertc::clientmonitor::ClientMonitor*, observertc::clientmonitor::PeerConnectionMonitor*) override;
 		void OnNewInboundTrackMonitor(
-		  clientmonitor::ClientMonitor*, clientmonitor::InboundTrackMonitor*) override;
+		  observertc::clientmonitor::ClientMonitor*, observertc::clientmonitor::InboundTrackMonitor*) override;
 		void OnNewOutboundTrackMonitor(
-		  clientmonitor::ClientMonitor*, clientmonitor::OutboundTrackMonitor*) override;
+		  observertc::clientmonitor::ClientMonitor*, observertc::clientmonitor::OutboundTrackMonitor*) override;
 
-		std::vector<clientmonitor::ClientSample> samples;
-		std::vector<clientmonitor::ReportedClientIssue> issues;
-		std::vector<clientmonitor::RaisedClientIssue> updatedIssues;
-		std::vector<clientmonitor::ResolvedClientIssue> resolvedIssues;
-		std::vector<clientmonitor::ClientEvent> events;
+		std::vector<observertc::clientmonitor::ClientSample> samples;
+		std::vector<observertc::clientmonitor::ReportedClientIssue> issues;
+		std::vector<observertc::clientmonitor::RaisedClientIssue> updatedIssues;
+		std::vector<observertc::clientmonitor::ResolvedClientIssue> resolvedIssues;
+		std::vector<observertc::clientmonitor::ClientEvent> events;
 		std::vector<StatsCollectionGapEvent> gaps;
 		size_t closed{ 0 };
 		size_t dryInbound{ 0 };
