@@ -10,6 +10,31 @@ ObserveRTC `ClientSample`s. The JS library is the reference implementation. When
 doubt, read the JS source and match it; when the C++ deliberately differs, record it in
 `PORTING.md` under "Where the C++ differs on purpose".
 
+## Using the library
+
+If you are integrating client-monitor-cpp into an application rather than changing it, read
+[docs/USAGE.md](docs/USAGE.md): one recipe per public API, its snippets compiled and run by
+`examples/api_tour.cpp`. The short version:
+
+| To | Call |
+|---|---|
+| Record a moment in the call | `monitor.AddEvent("TYPE", payload)` (types in `ClientEventTypes`) |
+| Record a fact about the client | `monitor.AddMetaData(ClientMetaTypes::..., payload)` |
+| Report a one-shot problem | `monitor.AddIssue("type", payload)` |
+| Report a condition that lasts | `monitor.RaiseIssue("key", "type", payload)`; same key again updates it |
+| Clear it | `monitor.ResolveIssue("key", std::string("comment"))`; `IsIssueActive("key")` to check |
+| Ship app measurements | `monitor.AddExtensionStats({ "type", payload, std::string("id") })`, or a provider via `AddExtensionStatsProvider` |
+| Read them back | `monitor.GetExtensionStatsPayload("id")` |
+| Tell detectors what stats can't show | `monitor.SetInboundTrackContext(trackId, context)` (e.g. `paused`) |
+| Feed non-libwebrtc stats | `monitor.AddPeerConnection(std::make_shared<FunctionStatsCollector>(...))` |
+| Hear back | derive from `ClientMonitor::Listener`, override `OnSampleCreated`, `OnIssue`, ... |
+
+Rules an integration must keep: never call `Collect()` (or anything that waits on it) from the
+WebRTC signaling thread; keep listener callbacks short, they run with the monitor's lock held;
+`AddEvent` and `AddMetaData` are dropped when neither `samplingPeriodInMs > 0` nor
+`bufferingEventsForSamples` is set. When you add or change a public API, update `docs/USAGE.md`
+and `examples/api_tour.cpp` together.
+
 ## Build and test
 
 ```sh
@@ -45,6 +70,7 @@ are not compiled in CI. Keep them minimal and say so when you change them untest
 - `include/clientmonitor/schema/ClientSample.hpp`, `Samples.hpp`, `JsonSupport.hpp`: **generated**
   by observertc-schemas (`npm run generate:cpp`, `outputs/cpp/`). Never edit them here; regenerate
   there and copy them over. `SchemaTypes.hpp` beside them is hand-written.
+- `docs/USAGE.md`: the API guide; `examples/api_tour.cpp` compiles and runs its snippets.
 - `test/src/*.test.cpp`: Catch2 v2 tests. `test/consumer/`: FetchContent consumer.
 - `PORTING.md`: what is ported from JS, what is not, and the deliberate differences. Keep it current.
 

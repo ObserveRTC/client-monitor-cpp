@@ -23,6 +23,9 @@ FetchContent_Declare(
 	GIT_REPOSITORY https://github.com/catchorg/Catch2.git
 	GIT_TAG v2.13.10
 	GIT_SHALLOW TRUE
+	# Only the single header is used: point at a directory without a CMakeLists.txt so Catch2's own
+	# (which declares an old cmake_minimum_required and warns on new CMake) is never configured.
+	SOURCE_SUBDIR single_include
 )
 FetchContent_MakeAvailable(catch2)
 

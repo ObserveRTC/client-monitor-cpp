@@ -3,6 +3,14 @@
 All notable changes to client-monitor-cpp. Versions follow [Semantic Versioning](https://semver.org/);
 the version lives in `project(... VERSION ...)` in `CMakeLists.txt` and is tagged as `vX.Y.Z`.
 
+## Unreleased
+
+- `docs/USAGE.md`: a recipe for every public API, and `examples/api_tour.cpp`, which compiles and
+  runs all of them in CI.
+- Logging macros no longer use the GNU `##__VA_ARGS__` extension, so Clang with `-Wpedantic`
+  (and warnings as errors) builds cleanly.
+- Tests no longer configure Catch2's own CMake project, which warned on recent CMake.
+
 ## 0.1.0
 
 First release: a native C++ port of the core of

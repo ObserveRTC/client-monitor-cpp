@@ -25,8 +25,10 @@ jobs:
         run: cmake --build build --parallel
       - name: Test
         run: ctest --test-dir build --output-on-failure
-      - name: Example
-        run: ./build/examples/basic_monitor
+      - name: Examples
+        run: |
+          ./build/examples/basic_monitor
+          ./build/examples/api_tour
 
   sanitizers:
     name: Sanitizers (${{ matrix.sanitizer }})

@@ -214,6 +214,11 @@ observer.Bind(pc);
 monitor.AddPeerConnection(std::make_shared<clientmonitor::FunctionStatsCollector>([] { return GetMyStats(); }));
 ```
 
+**[docs/USAGE.md](docs/USAGE.md)** has a recipe for every API: `AddEvent`, `AddMetaData`,
+`AddIssue`, `RaiseIssue` / `ResolveIssue`, `AddExtensionStats` and providers, track context,
+reading metrics and verdicts, detectors, score, logging and `Close()`.
+[`examples/api_tour.cpp`](examples/api_tour.cpp) runs all of it.
+
 ## Integration notes
 
 Read these before wiring the monitor into an application. Most of them come from libwebrtc's
@@ -305,6 +310,8 @@ bindings/                                      the bindings' sources, built only
 cmake/version.hpp.in                           <clientmonitor/version.hpp>
 test/                                          Catch2 tests, run without libwebrtc
 test/consumer/                                 an application consuming the library through FetchContent
+examples/                                      basic_monitor, and api_tour (the snippets of docs/USAGE.md)
+docs/USAGE.md                                  the API guide
 ```
 
 The sample types come from the observertc-schemas project: `npm run generate:cpp` there writes

@@ -84,16 +84,23 @@ namespace clientmonitor
 	#define _CM_LOG_ARG CM_CLASS, __FUNCTION__
 #endif
 
-#define _CM_LOG(level, tag, desc, ...) \
+// The format string is the first of __VA_ARGS__ (no GNU ##__VA_ARGS__, which -Wpedantic flags on
+// Clang): the "[TAG] Class::Method() | " prefix is printed first and the caller's text appended.
+#define _CM_LOG(level, tag, ...) \
 	do \
 	{ \
 		if (clientmonitor::Logger::handler && clientmonitor::Logger::logLevel >= clientmonitor::Logger::LogLevel::level) \
 		{ \
 			std::lock_guard<std::mutex> loggerLock(clientmonitor::Logger::mutex); \
-			int loggerWritten = std::snprintf(clientmonitor::Logger::buffer, clientmonitor::Logger::BufferSize, "[" tag "]" _CM_LOG_STR_DESC desc, _CM_LOG_ARG, ##__VA_ARGS__); \
+			int loggerWritten = std::snprintf(clientmonitor::Logger::buffer, clientmonitor::Logger::BufferSize, "[" tag "]" _CM_LOG_STR_DESC, _CM_LOG_ARG); \
 			if (loggerWritten < 0) loggerWritten = 0; \
+			if (static_cast<size_t>(loggerWritten) < clientmonitor::Logger::BufferSize) \
+			{ \
+				const int loggerAppended = std::snprintf(clientmonitor::Logger::buffer + loggerWritten, clientmonitor::Logger::BufferSize - static_cast<size_t>(loggerWritten), __VA_ARGS__); \
+				if (loggerAppended > 0) loggerWritten += loggerAppended; \
+			} \
 			if (static_cast<size_t>(loggerWritten) >= clientmonitor::Logger::BufferSize) loggerWritten = clientmonitor::Logger::BufferSize - 1; \
-			clientmonitor::Logger::handler->OnLog(clientmonitor::Logger::LogLevel::level, clientmonitor::Logger::buffer, loggerWritten); \
+			clientmonitor::Logger::handler->OnLog(clientmonitor::Logger::LogLevel::level, clientmonitor::Logger::buffer, static_cast<size_t>(loggerWritten)); \
 		} \
 	} \
 	while (false)
@@ -115,31 +122,39 @@ namespace clientmonitor
 	#define CM_TRACE() ;
 #endif
 
-#define CM_DEBUG(desc, ...) _CM_LOG(LOG_DEBUG, "DEBUG", desc, ##__VA_ARGS__)
-#define CM_WARN(desc, ...) _CM_LOG(LOG_WARN, "WARN", desc, ##__VA_ARGS__)
-#define CM_ERROR(desc, ...) _CM_LOG(LOG_ERROR, "ERROR", desc, ##__VA_ARGS__)
+#define CM_DEBUG(...) _CM_LOG(LOG_DEBUG, "DEBUG", __VA_ARGS__)
+#define CM_WARN(...) _CM_LOG(LOG_WARN, "WARN", __VA_ARGS__)
+#define CM_ERROR(...) _CM_LOG(LOG_ERROR, "ERROR", __VA_ARGS__)
 
-#define CM_DUMP(desc, ...) \
+#define CM_DUMP(...) \
 	do \
 	{ \
-		std::fprintf(stdout, _CM_LOG_STR_DESC desc _CM_LOG_SEPARATOR_CHAR, _CM_LOG_ARG, ##__VA_ARGS__); \
+		std::fprintf(stdout, _CM_LOG_STR_DESC, _CM_LOG_ARG); \
+		std::fprintf(stdout, __VA_ARGS__); \
+		std::fprintf(stdout, _CM_LOG_SEPARATOR_CHAR); \
 		std::fflush(stdout); \
 	} \
 	while (false)
 
-#define CM_ABORT(desc, ...) \
+#define CM_ABORT(...) \
 	do \
 	{ \
-		std::fprintf(stderr, "[ABORT]" _CM_LOG_STR_DESC desc _CM_LOG_SEPARATOR_CHAR, _CM_LOG_ARG, ##__VA_ARGS__); \
+		std::fprintf(stderr, "[ABORT]" _CM_LOG_STR_DESC, _CM_LOG_ARG); \
+		std::fprintf(stderr, __VA_ARGS__); \
+		std::fprintf(stderr, _CM_LOG_SEPARATOR_CHAR); \
 		std::fflush(stderr); \
 		std::abort(); \
 	} \
 	while (false)
 
-#define CM_ASSERT(condition, desc, ...) \
+#define CM_ASSERT(condition, ...) \
 	if (!(condition)) \
 	{ \
-		CM_ABORT("failed assertion '%s': " desc, #condition, ##__VA_ARGS__); \
+		std::fprintf(stderr, "[ABORT]" _CM_LOG_STR_DESC "failed assertion '%s': ", _CM_LOG_ARG, #condition); \
+		std::fprintf(stderr, __VA_ARGS__); \
+		std::fprintf(stderr, _CM_LOG_SEPARATOR_CHAR); \
+		std::fflush(stderr); \
+		std::abort(); \
 	}
 
 // clang-format on

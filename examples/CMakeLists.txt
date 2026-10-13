@@ -8,5 +8,11 @@ if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
 	add_subdirectory(.. clientmonitor)
 endif()
 
-add_executable(basic_monitor basic_monitor.cpp)
-target_link_libraries(basic_monitor PRIVATE clientmonitor::clientmonitor)
+foreach(example basic_monitor api_tour)
+	add_executable(${example} ${example}.cpp)
+	target_link_libraries(${example} PRIVATE clientmonitor::clientmonitor)
+
+	if(NOT MSVC)
+		target_compile_options(${example} PRIVATE -Wall -Wextra -Wpedantic)
+	endif()
+endforeach()
