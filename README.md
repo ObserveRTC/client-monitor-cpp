@@ -31,6 +31,30 @@ target_link_libraries(my_app PRIVATE clientmonitor::clientmonitor)
 #include <clientmonitor/ClientMonitor.hpp>
 ```
 
+Or the release archive, which needs no git on the build machine:
+
+```cmake
+FetchContent_Declare(
+	clientmonitor
+	URL https://github.com/ObserveRTC/client-monitor-cpp/releases/download/v0.1.0/client-monitor-cpp.tar.gz
+)
+```
+
+Every release also answers at a fixed "latest" URL:
+
+```cmake
+FetchContent_Declare(
+	clientmonitor
+	URL https://github.com/ObserveRTC/client-monitor-cpp/releases/latest/download/client-monitor-cpp.tar.gz
+)
+```
+
+Prefer a pinned version for production builds. "Latest" is resolved only when a build directory
+is first configured; after that FetchContent keeps its copy, so machines with different build
+directories can quietly be on different versions, and a breaking release reaches every app at
+its next clean build. Each release lists the archive's SHA256 (`client-monitor-cpp.tar.gz.sha256`)
+for `URL_HASH`.
+
 `add_subdirectory(client-monitor-cpp)` on a git submodule works the same way. As a dependency the
 library builds neither its tests nor its examples.
 
@@ -100,7 +124,9 @@ project(myapp_native LANGUAGES CXX)
 include(FetchContent)
 FetchContent_Declare(
     clientmonitor
-    URL https://github.com/ObserveRTC/client-monitor-cpp/archive/refs/tags/v0.1.0.tar.gz
+    URL https://github.com/ObserveRTC/client-monitor-cpp/releases/download/v0.1.0/client-monitor-cpp.tar.gz
+    # or always the newest release (resolved on the first sync of a build directory only):
+    # URL https://github.com/ObserveRTC/client-monitor-cpp/releases/latest/download/client-monitor-cpp.tar.gz
 )
 FetchContent_MakeAvailable(clientmonitor)
 
@@ -108,9 +134,9 @@ add_library(myapp_native SHARED native-lib.cpp)
 target_link_libraries(myapp_native PRIVATE clientmonitor::clientmonitor log)
 ```
 
-The release archive `URL` needs no git on the build machine and pins the version. With
-libmediasoupclient, add it before this block and set `CLIENTMONITOR_MEDIASOUPCLIENT` and
-`CLIENTMONITOR_JSON_INCLUDE_PATH` as shown above.
+The release archive `URL` needs no git on the build machine and pins the version; see "Add it to
+your application" for the trade-offs of `latest`. With libmediasoupclient, add it before this
+block and set `CLIENTMONITOR_MEDIASOUPCLIENT` and `CLIENTMONITOR_JSON_INCLUDE_PATH` as shown above.
 
 **3. Android specifics**
 
@@ -343,9 +369,14 @@ application already built on libmediasoupclient finds the API familiar. New code
 
 ## Releasing
 
-1. Bump `VERSION` in `project(...)` in `CMakeLists.txt` and add a section to `CHANGELOG.md`.
-2. Commit, then tag and push: `git tag v0.2.0 && git push origin master v0.2.0`.
-3. Applications move by changing `GIT_TAG`.
+1. Bump `VERSION` in `project(...)` in `CMakeLists.txt` and add a `## X.Y.Z` section to
+   `CHANGELOG.md`.
+2. Commit, then tag and push: `git tag -a v0.2.0 -m "client-monitor-cpp 0.2.0" && git push origin main v0.2.0`.
+3. The release workflow checks the tag against `VERSION`, builds and tests, and publishes a GitHub
+   release with `client-monitor-cpp.tar.gz` (and its `.sha256`), using the CHANGELOG section as
+   the notes. It fails, and publishes nothing, if the versions differ or the section is missing.
+4. Applications pinned to a version move by changing the tag in their URL; those on
+   `releases/latest` pick it up on their next clean configure.
 
 ## License
 
