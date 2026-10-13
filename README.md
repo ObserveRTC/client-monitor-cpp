@@ -60,6 +60,106 @@ FetchContent_MakeAvailable(clientmonitor)
 nlohmann::json is picked in this order: `CLIENTMONITOR_JSON_INCLUDE_PATH`, an existing
 `nlohmann_json::nlohmann_json` target, `find_package(nlohmann_json)`, then a download.
 
+## Android (Gradle)
+
+Gradle does not build C++ itself: it hands native code to CMake through `externalNativeBuild`, so
+the library goes into the app's native `CMakeLists.txt` as above.
+
+**1. Point Gradle at the native CMake project** (`app/build.gradle.kts`):
+
+```kotlin
+android {
+    ndkVersion = "26.1.10909125"          // any recent NDK
+
+    defaultConfig {
+        minSdk = 24
+        externalNativeBuild {
+            cmake {
+                cppFlags += "-std=c++17"
+                arguments += listOf("-DANDROID_STL=c++_shared")
+            }
+        }
+        ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64") }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+            version = "3.22.1"            // the SDK's bundled CMake is enough (3.14+ needed)
+        }
+    }
+}
+```
+
+**2. Pull the library in** (`app/src/main/cpp/CMakeLists.txt`):
+
+```cmake
+cmake_minimum_required(VERSION 3.14)
+project(myapp_native LANGUAGES CXX)
+
+include(FetchContent)
+FetchContent_Declare(
+    clientmonitor
+    URL https://github.com/ObserveRTC/client-monitor-cpp/archive/refs/tags/v0.1.0.tar.gz
+)
+FetchContent_MakeAvailable(clientmonitor)
+
+add_library(myapp_native SHARED native-lib.cpp)
+target_link_libraries(myapp_native PRIVATE clientmonitor::clientmonitor log)
+```
+
+The release archive `URL` needs no git on the build machine and pins the version. With
+libmediasoupclient, add it before this block and set `CLIENTMONITOR_MEDIASOUPCLIENT` and
+`CLIENTMONITOR_JSON_INCLUDE_PATH` as shown above.
+
+**3. Android specifics**
+
+- **Network at configure time.** FetchContent downloads this library and nlohmann::json on the
+  first Gradle sync. For offline or locked-down CI, add the repository as a git submodule and use
+  `add_subdirectory(third_party/client-monitor-cpp)`, or pass
+  `-DFETCHCONTENT_FULLY_DISCONNECTED=ON` once the sources are cached.
+- **One C++ runtime.** Build every native library with the same STL (`c++_shared`), particularly
+  next to a prebuilt libwebrtc; mixing static and shared runtimes across libraries crashes in ways
+  that are hard to trace.
+- **libwebrtc binding.** Compile it against the same libwebrtc headers your Android WebRTC build
+  uses: set `LIBWEBRTC_INCLUDE_PATH` (and `LIBWEBRTC_BINARY_PATH` if you link libwebrtc here).
+- **Threads.** The internal timer thread works on Android. The integration notes below apply
+  unchanged: never call `Collect()` on the signaling thread or the UI thread.
+- **Logging to logcat.**
+
+  ```cpp
+  #include <android/log.h>
+  #include <clientmonitor/Logger.hpp>
+
+  class LogcatHandler : public clientmonitor::Logger::LogHandlerInterface
+  {
+  	void OnLog(clientmonitor::Logger::LogLevel /*level*/, char* payload, size_t /*len*/) override
+  	{
+  		__android_log_print(ANDROID_LOG_INFO, "ClientMonitor", "%s", payload);
+  	}
+  };
+
+  static LogcatHandler logcatHandler;
+
+  clientmonitor::Logger::SetHandler(&logcatHandler);
+  clientmonitor::Logger::SetLogLevel(clientmonitor::Logger::LogLevel::LOG_WARN);
+  ```
+
+**4. A Kotlin or Java app**
+
+The monitor runs in the native layer; Kotlin needs only a thin JNI bridge:
+
+- create the `ClientMonitor` in a JNI `init` call and `Close()` / destroy it in a `dispose` call,
+  from a thread other than the timer's;
+- implement a `ClientMonitor::Listener` whose `OnSampleCreated` copies `sample.ToJson().dump()` into
+  a queue, and deliver the strings to Kotlin from your own thread (attach it with
+  `JavaVM::AttachCurrentThread`), never from inside the callback;
+- expose the few calls the app makes itself, such as `SetInboundTrackContext()`, `AddEvent()` or
+  `RaiseIssue()`, as JNI methods.
+
+If Kotlin owns the WebRTC stack (the Android WebRTC SDK's `PeerConnection`), a Kotlin monitor fits
+better; this library fits when the WebRTC stack is native, for example libmediasoupclient behind JNI.
+
 ## Build and test this repository
 
 ```sh
