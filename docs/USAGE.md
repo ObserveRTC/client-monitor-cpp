@@ -19,12 +19,14 @@ Everything is in `observertc::clientmonitor`. The snippets spell it out; in your
 `namespace cm = observertc::clientmonitor;` keeps it short.
 
 - [Create a monitor](#create-a-monitor)
+- [One monitor, several calls](#one-monitor-several-calls)
 - [Listen](#listen)
 - [Client events: `AddEvent`](#client-events-addevent)
 - [Meta data: `AddMetaData`](#meta-data-addmetadata)
 - [Issues: `AddIssue`, `RaiseIssue`, `ResolveIssue`](#issues)
 - [Extension stats: `AddExtensionStats` and providers](#extension-stats)
 - [Peer connections and tracks](#peer-connections-and-tracks)
+- [Attachments](#attachments), and [what the mediasoup binding attaches](#mediasoup-attachments)
 - [Track context](#track-context)
 - [Collect, sample and read state back](#collect-sample-and-read-state-back)
 - [Detectors](#detectors)
@@ -57,6 +59,30 @@ config.transportDelayDetector = std::nullopt;
 ```
 
 Listeners can be added and removed later with `AddListener()` / `RemoveListener()`.
+
+## One monitor, several calls
+
+A client that keeps one monitor for its lifetime, as the web client does, samples only while it
+is in a call and keeps what happens before (device snapshots, capture failures) for the first
+sample of the call:
+
+```cpp
+config.collectingPeriodInMs         = 5000;
+config.samplingPeriodInMs           = 0;     // nothing is sampled before the call
+config.bufferingEventsForSamples    = true;  // ... but events, issues and meta are kept for it
+config.addClientJointEventOnCreated = false; // CLIENT_JOINED / CLIENT_LEFT per call, not per monitor
+config.addClientLeftEventOnClose    = false;
+
+// The call is up.
+monitor.SetCallId(callId);
+monitor.AddClientJoinEvent();
+monitor.SetSamplingPeriod(5000); // the next sample carries everything buffered so far
+
+// The call ends (payload { "reason": "livecall-rejoin" } when it is replaced by a rejoin).
+monitor.AddClientLeftEvent();
+monitor.CreateSample();
+monitor.SetSamplingPeriod(0);
+```
 
 ## Listen
 
@@ -130,6 +156,18 @@ Facts about the client rather than moments in the call. Same shape as `AddEvent`
 ```cpp
 monitor.AddMetaData(
   observertc::clientmonitor::ClientMetaTypes::OPERATION_SYSTEM, { { "name", "macOS" }, { "version", "15.1" } });
+```
+
+An object payload's `peerConnectionId` and `trackId` are copied to the item's own fields. When the
+payload is not an object, give the fields directly:
+
+```cpp
+observertc::clientmonitor::ClientMetaData sdp;
+
+sdp.type             = observertc::clientmonitor::ClientMetaTypes::LOCAL_SDP;
+sdp.payload          = "v=0\r\n...";
+sdp.peerConnectionId = "pc-1";
+monitor.AddMetaData(sdp);
 ```
 
 ## Issues
@@ -280,6 +318,65 @@ peerConnection->AddMediaTrack(
 
 The track id must match the stats' `trackIdentifier`. Track attachments are copied into that
 track's sample entries.
+
+## Attachments
+
+Attachments are free-form JSON shipped on an object's entry in every sample. The observer joins on
+them, for example a client's outbound track to the SFU's producer. They can go on every level:
+
+| Level | Set with | Ends up in |
+|---|---|---|
+| Client | `monitor.SetAttachments(json)` replaces, `monitor.UpdateAttachments(patch)` merges | `ClientSample.attachments` |
+| Peer connection | `AddPeerConnection(collector, id, attachments)`, or `GetAttachments()` on its monitor | `peerConnections[].attachments` |
+| Track | `AddMediaTrack(track, attachments)`, or `GetAttachments()` on the track monitor | `inboundTracks[]` / `outboundTracks[].attachments` |
+| Data channel | `peerConnection->SetDataChannelAttachments(sctpStreamId, json)` | `dataChannels[].attachments` |
+| Any other stats object | `UpdateAttachments(patch)` on its monitor (`GetOutboundRtpMonitor(ssrc)`, ...) | that entry's `attachments` |
+
+`UpdateAttachments` is an RFC 7386 merge patch: keys given are set, keys set to `null` removed,
+the rest kept. That suits attachments owned by different parts of an application:
+
+```cpp
+monitor.UpdateAttachments({
+  { "senderSideCoupledCongestion", { { "enabled", true }, { "enforcedPolicy", "v1" } } }
+});
+monitor.UpdateAttachments({ { "senderSideCoupledCongestion", nullptr } }); // gone again
+```
+
+Data channel attachments are matched by `dataChannelIdentifier`, the SCTP stream id, and can be
+declared before the channel's stats exist. Stats monitors keep their attachments across reports;
+they are lost only when the stats object goes away.
+
+Like every monitor pointer, the per-object `GetAttachments()` / `UpdateAttachments()` take no lock:
+call them inside a listener callback, or under `std::lock_guard lock(monitor.GetMutex())`.
+`ClientMonitor::UpdateAttachments()` and `SetDataChannelAttachments()` lock themselves.
+
+### Mediasoup attachments
+
+With `CLIENTMONITOR_MEDIASOUPCLIENT`, `mediasoupclient::TransportMonitor` adds what the web
+client's monitor adds when it binds a mediasoup device, so the samples of a native client and a
+web client join to the SFU the same way:
+
+| Sample field | Value | Set by |
+|---|---|---|
+| `peerConnections[].peerConnectionId` | the transport id | `Bind()` |
+| `peerConnections[].attachments.direction` | `"send"` or `"recv"` | `Bind()` |
+| `outboundTracks[].attachments` | `{ producerId }`, kept across `ReplaceTrack()` | `OnProducerCreated()`, `OnProducerTrackReplaced()` |
+| `inboundTracks[].attachments` | `{ producerId, consumerId }` | `OnConsumerCreated()` |
+| `dataChannels[].attachments` | `{ dataProducerId }` or `{ dataProducerId, dataConsumerId }` | `OnDataProducerCreated()`, `OnDataConsumerCreated()` |
+
+and the events `PEER_CONNECTION_OPENED` / `_CLOSED` / `_STATE_CHANGED`, `PRODUCER_ADDED` /
+`_REMOVED` / `_PAUSED` / `_RESUMED`, `CONSUMER_*`, `DATA_PRODUCER_*`, `DATA_CONSUMER_*` and
+`MEDIA_TRACK_REMOVED` with the producer and consumer ids spread in, each with its
+`peerConnectionId`. It also keeps the track contexts (`paused`, and `remoteOutboundTrackPaused`
+through `OnConsumerProducerPaused()` / `OnConsumerProducerResumed()`) that stop detectors from
+reporting a paused track as dry.
+
+libmediasoupclient has no observer to subscribe to, so the application calls the `On*` methods
+where it creates, pauses and closes things. [`examples/mediasoup_client.cpp`](../examples/mediasoup_client.cpp)
+does all of it in one class; CI compiles it against libmediasoupclient.
+
+Not available from libmediasoupclient, so not sent by the binding: `ICE_GATHERING_STATE_CHANGED`,
+`MEDIA_TRACK_MUTED` / `_UNMUTED` and the track `label` / `contentHint` in track events.
 
 ## Track context
 

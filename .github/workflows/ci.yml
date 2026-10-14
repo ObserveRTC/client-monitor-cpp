@@ -3,10 +3,11 @@ name: CI
 on:
   push:
     branches:
-      - master
+      - main
   pull_request:
     branches:
-      - master
+      - main
+  workflow_dispatch:
 
 jobs:
   test:
@@ -60,3 +61,40 @@ jobs:
         run: cmake --build build-consumer --parallel
       - name: Run
         run: ./build-consumer/consumer
+
+  bindings:
+    # The libwebrtc and libmediasoupclient bindings and examples/mediasoup_client.cpp, compiled
+    # against libmediasoupclient and a prebuilt libwebrtc of the milestone it targets. Compile only:
+    # see test/bindings/CMakeLists.txt. libwebrtc's headers need clang.
+    name: Bindings (libmediasoupclient ${{ matrix.mediasoupclient }}, libwebrtc m140)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        mediasoupclient: ["3.5.0", "v3"]
+    env:
+      LIBWEBRTC_RELEASE: "140.7339.2.0"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cache libwebrtc
+        id: cache-webrtc
+        uses: actions/cache@v4
+        with:
+          path: webrtc
+          key: libwebrtc-linux-x64-${{ env.LIBWEBRTC_RELEASE }}
+      - name: Download libwebrtc
+        if: steps.cache-webrtc.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p webrtc
+          curl -sSfL "https://github.com/crow-misia/libwebrtc-bin/releases/download/${LIBWEBRTC_RELEASE}/libwebrtc-linux-x64.tar.xz" | tar xJ -C webrtc
+      - name: Configure
+        env:
+          CXX: clang++
+        run: |
+          cmake -S test/bindings -B build-bindings \
+            -DCLIENTMONITOR_SOURCE_DIR=$GITHUB_WORKSPACE \
+            -DMEDIASOUPCLIENT_GIT_TAG=${{ matrix.mediasoupclient }} \
+            -DLIBWEBRTC_INCLUDE_PATH=$GITHUB_WORKSPACE/webrtc/include \
+            -DLIBWEBRTC_BINARY_PATH=$GITHUB_WORKSPACE/webrtc/lib
+      - name: Build
+        run: cmake --build build-bindings --parallel

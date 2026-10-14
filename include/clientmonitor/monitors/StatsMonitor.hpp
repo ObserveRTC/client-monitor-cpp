@@ -4,6 +4,7 @@
 #include <nlohmann/json.hpp>
 
 #include <optional>
+#include <string>
 
 namespace observertc::clientmonitor
 {
@@ -57,10 +58,32 @@ namespace observertc::clientmonitor
 		{
 			return this->appData;
 		}
+		/**
+		 * Shipped as `attachments` on this object's entry in every sample, so the observer can
+		 * join it to server-side ids (a mediasoup producer, consumer, data producer, ...). Kept
+		 * across reports: the raw stats never carry attachments, so they are stamped on at
+		 * sampling time. Null (the default) sends none.
+		 */
+		nlohmann::json& GetAttachments()
+		{
+			return this->attachments;
+		}
+		/** Merges `patch` into the attachments (RFC 7386: a null value removes that key). */
+		void UpdateAttachments(const nlohmann::json& patch)
+		{
+			this->attachments.merge_patch(patch);
+		}
 		/** The latest report, as it goes into a sample. */
 		virtual T CreateSample()
 		{
-			return this->stats;
+			T sample = this->stats;
+
+			if (!this->attachments.is_null())
+			{
+				sample.attachments = this->attachments;
+			}
+
+			return sample;
 		}
 
 		/**
@@ -110,6 +133,7 @@ namespace observertc::clientmonitor
 		std::optional<double> deltaTime;
 		double statsClockTime{ 0 };
 		nlohmann::json appData = nlohmann::json::object();
+		nlohmann::json attachments;
 	};
 } // namespace observertc::clientmonitor
 

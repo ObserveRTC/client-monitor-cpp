@@ -26,6 +26,8 @@ If you are integrating client-monitor-cpp into an application rather than changi
 | Ship app measurements | `monitor.AddExtensionStats({ "type", payload, std::string("id") })`, or a provider via `AddExtensionStatsProvider` |
 | Read them back | `monitor.GetExtensionStatsPayload("id")` |
 | Tell detectors what stats can't show | `monitor.SetInboundTrackContext(trackId, context)` (e.g. `paused`) |
+| Attach server-side ids to a sample | `monitor.UpdateAttachments(patch)`, `pc->SetDataChannelAttachments(streamId, json)`, `GetAttachments()` / `UpdateAttachments()` on any monitor |
+| Bind libmediasoupclient | `mediasoupclient::TransportMonitor` per transport; see `examples/mediasoup_client.cpp` |
 | Feed non-libwebrtc stats | `monitor.AddPeerConnection(std::make_shared<FunctionStatsCollector>(...))` |
 | Hear back | derive from `ClientMonitor::Listener`, override `OnSampleCreated`, `OnIssue`, ... |
 
@@ -59,8 +61,20 @@ cmake -S test/consumer -B build-consumer -DCLIENTMONITOR_SOURCE_DIR=$PWD
 cmake --build build-consumer && ./build-consumer/consumer
 ```
 
-The bindings (`CLIENTMONITOR_LIBWEBRTC`, `CLIENTMONITOR_MEDIASOUPCLIENT`) need a libwebrtc build and
-are not compiled in CI. Keep them minimal and say so when you change them untested.
+The bindings (`CLIENTMONITOR_LIBWEBRTC`, `CLIENTMONITOR_MEDIASOUPCLIENT`) and
+`examples/mediasoup_client.cpp` are compiled (not linked or run) by `test/bindings` against
+libmediasoupclient and a prebuilt libwebrtc; CI's `bindings` job does it. Locally, with clang
+(libwebrtc's headers need it) and a libwebrtc from
+https://github.com/crow-misia/libwebrtc-bin/releases (the milestone libmediasoupclient targets):
+
+```sh
+CXX=clang++ cmake -S test/bindings -B build-bindings -DCLIENTMONITOR_SOURCE_DIR=$PWD \
+  -DLIBWEBRTC_INCLUDE_PATH=/path/to/webrtc/include -DLIBWEBRTC_BINARY_PATH=/path/to/webrtc/lib
+cmake --build build-bindings -j
+```
+
+Run it whenever you touch `bindings/`, their headers or `examples/mediasoup_client.cpp`. Behaviour
+of the bindings is still untested; keep them thin.
 
 ## Layout
 

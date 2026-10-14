@@ -3,6 +3,39 @@
 All notable changes to client-monitor-cpp. Versions follow [Semantic Versioning](https://semver.org/);
 the version lives in `project(... VERSION ...)` in `CMakeLists.txt` and is tagged as `vX.Y.Z`.
 
+## 0.2.0
+
+Makes a libmediasoupclient application's samples join to the SFU the way the web client's do, and
+the bindings easy to build.
+
+**Breaking:** everything moved into the `observertc::clientmonitor` namespace (the `v0.1.0` tag
+predates the move; the 0.1.0 notes below already describe it).
+
+- Attachments on every level of a sample: `ClientMonitor::UpdateAttachments()` merges into the
+  client attachments (RFC 7386, `null` removes a key); every stats monitor has `GetAttachments()` /
+  `UpdateAttachments()`, kept across reports; `PeerConnectionMonitor::SetDataChannelAttachments()`
+  binds a data channel's attachments by SCTP stream id.
+- `ClientMonitor::AddMetaData(ClientMetaData)`, for payloads that are not objects (an SDP with its
+  `peerConnectionId`). `AddMetaData({})` and `AddMetaData({ "type" })` are now ambiguous;
+  write `AddMetaData("type")`.
+- mediasoupclient binding, matching the web client's `MediasoupTransportBinding`:
+  - `direction: "send" | "recv"` on the peer connection attachments;
+  - `{ dataProducerId[, dataConsumerId] }` on the data channel entries;
+  - `ReplaceTrack()` drops the old track and keeps `producerId` on the new one; a producer's track
+    is remembered, so closing it works after the track is gone;
+  - `MEDIA_TRACK_REMOVED` with the producer and consumer ids when either closes;
+  - `OnConsumerProducerPaused()` / `OnConsumerProducerResumed()` set `remoteOutboundTrackPaused`;
+  - `GetTransportId()`, `GetDirection()`.
+- Build:
+  - with `CLIENTMONITOR_MEDIASOUPCLIENT`, libsdptransform's `json.hpp` is found and used
+    automatically. The README's earlier `${libsdptransform_SOURCE_DIR}` recipe expanded to an empty
+    path from the application's scope; a `CLIENTMONITOR_JSON_INCLUDE_PATH` without a `json.hpp` is
+    now an error;
+  - libwebrtc's include directories are `SYSTEM`, so applications building with `-Werror` compile;
+  - `test/bindings` compiles both bindings and the new `examples/mediasoup_client.cpp` against
+    libmediasoupclient and a prebuilt libwebrtc m140, in CI;
+  - CI ran on `master`, which does not exist; it runs on `main` now.
+
 ## 0.1.0
 
 First release: a native C++ port of the core of
