@@ -61,7 +61,7 @@ namespace observertc::clientmonitor
 
 	IceTransportStats IceTransportMonitor::CreateSample()
 	{
-		auto sample = this->stats;
+		auto sample = StatsMonitor::CreateSample();
 
 		if (!this->peerConnection->GetParent()->GetConfig().sendIceTransportMetadataOnChangeOnly)
 		{

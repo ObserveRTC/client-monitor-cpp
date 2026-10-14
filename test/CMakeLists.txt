@@ -6,6 +6,7 @@ set(
 	SOURCE_FILES
 	src/tests.cpp
 	src/helpers.cpp
+	src/Attachments.test.cpp
 	src/ClientMonitor.test.cpp
 	src/Detectors.test.cpp
 	src/IssueRegistry.test.cpp

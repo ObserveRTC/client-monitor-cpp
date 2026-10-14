@@ -20,6 +20,18 @@
  *   transportMonitor->Bind(sendTransport);
  *   auto* producer = sendTransport->Produce(...);
  *   transportMonitor->OnProducerCreated(producer);
+ *
+ * What ends up in the samples, as the web client's MediasoupTransportBinding sends it, so the
+ * observer can join client stats to the SFU's objects:
+ *
+ *   peerConnections[].peerConnectionId        the transport id
+ *   peerConnections[].attachments.direction   "send" | "recv"
+ *   outboundTracks[].attachments              { producerId }
+ *   inboundTracks[].attachments               { producerId, consumerId }
+ *   dataChannels[].attachments                { dataProducerId } | { dataProducerId, dataConsumerId }
+ *
+ * plus the PRODUCER_*, CONSUMER_*, DATA_PRODUCER_*, DATA_CONSUMER_*, PEER_CONNECTION_* and
+ * MEDIA_TRACK_REMOVED events with the same payload keys.
  */
 
 #include "clientmonitor/ClientMonitor.hpp"
@@ -32,6 +44,7 @@
 
 #include <atomic>
 #include <future>
+#include <map>
 #include <string>
 
 namespace observertc::clientmonitor
@@ -60,16 +73,32 @@ namespace observertc::clientmonitor
 		class TransportMonitor
 		{
 		public:
+			/**
+			 * `attachments` go on the peer connection entry of every sample, next to the
+			 * `direction` ("send" or "recv") Bind() adds from the transport's type.
+			 */
 			explicit TransportMonitor(
 			  ClientMonitor* clientMonitor, const nlohmann::json& attachments = nlohmann::json());
 			~TransportMonitor();
 
 		public:
-			/** Starts monitoring; the transport id becomes the peer connection id. */
+			/**
+			 * Starts monitoring; the transport id becomes the peer connection id, as the SFU knows
+			 * the WebRtcTransport by it.
+			 */
 			PeerConnectionMonitor* Bind(::mediasoupclient::Transport* transport);
 			/** Stops monitoring. Call before closing the transport. */
 			void Close();
 			PeerConnectionMonitor* GetPeerConnectionMonitor() const;
+			const std::string& GetTransportId() const
+			{
+				return this->transportId;
+			}
+			/** "send" or "recv" once bound, empty before. */
+			const std::string& GetDirection() const
+			{
+				return this->direction;
+			}
 
 			void OnConnectionStateChange(const std::string& connectionState);
 
@@ -84,6 +113,13 @@ namespace observertc::clientmonitor
 			void OnConsumerPaused(::mediasoupclient::Consumer* consumer);
 			void OnConsumerResumed(::mediasoupclient::Consumer* consumer);
 			void OnConsumerClosed(::mediasoupclient::Consumer* consumer);
+			/**
+			 * The server paused or resumed the producer this consumer reads from (mediasoup's
+			 * `producerpause` / `producerresume` notifications). Keeps the dry-track detector from
+			 * raising on a track whose sender stopped on purpose.
+			 */
+			void OnConsumerProducerPaused(::mediasoupclient::Consumer* consumer);
+			void OnConsumerProducerResumed(::mediasoupclient::Consumer* consumer);
 
 			void OnDataProducerCreated(::mediasoupclient::DataProducer* dataProducer);
 			void OnDataProducerClosed(::mediasoupclient::DataProducer* dataProducer);
@@ -92,12 +128,23 @@ namespace observertc::clientmonitor
 
 		private:
 			void FireEvent(const char* type, nlohmann::json payload);
+			/** MEDIA_TRACK_REMOVED for `trackId`; `track` (may be null) adds kind, enabled, state. */
+			void FireTrackRemoved(
+			  const std::string& trackId,
+			  ::webrtc::MediaStreamTrackInterface* track,
+			  const nlohmann::json& attachments);
+			/** Starts monitoring `producer`'s current track, dropping the one it had before. */
+			void TrackProducer(::mediasoupclient::Producer* producer);
 
 		private:
 			ClientMonitor* clientMonitor{ nullptr };
 			nlohmann::json attachments;
 			std::string transportId;
+			std::string direction;
 			std::shared_ptr<TransportStatsCollector> collector;
+			// Producer id -> the track id monitored for it. ReplaceTrack() changes the track, not
+			// the producer, and a closed producer may no longer name its track.
+			std::map<std::string, std::string> producerTracks;
 		};
 
 		class MonitoredSendTransportListener : public ::mediasoupclient::SendTransport::Listener

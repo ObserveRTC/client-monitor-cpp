@@ -62,6 +62,16 @@ int main()
 
 	monitor.SetAttachments({ { "roomId", "room-42" }, { "userId", "user-7" } });
 
+	// Merge one key in (or out again with null) without touching the others.
+	monitor.UpdateAttachments(
+	  {
+	    { "senderSideCoupledCongestion", { { "enabled", true }, { "enforcedPolicy", "v1" } } }
+  });
+	monitor.UpdateAttachments(
+	  {
+	    { "senderSideCoupledCongestion", nullptr }
+  });
+
 	/* Client events. */
 
 	// A custom event, buffered into the next sample.
@@ -77,6 +87,14 @@ int main()
 
 	monitor.AddMetaData(
 	  observertc::clientmonitor::ClientMetaTypes::OPERATION_SYSTEM, { { "name", "macOS" }, { "version", "15.1" } });
+
+	// Every field given, for a payload that is not an object.
+	observertc::clientmonitor::ClientMetaData sdp;
+
+	sdp.type             = observertc::clientmonitor::ClientMetaTypes::LOCAL_SDP;
+	sdp.payload          = "v=0\r\n...";
+	sdp.peerConnectionId = "pc-1";
+	monitor.AddMetaData(sdp);
 
 	/* One-shot issues. */
 
@@ -157,6 +175,15 @@ int main()
 
 	peerConnection->AddMediaTrack(
 	  std::make_shared<observertc::clientmonitor::BasicMediaTrack>("remote-audio", "audio"), { { "participant", "alice" } });
+
+	// Attachments on a data channel, by its SCTP stream id (dataChannelIdentifier), before or after
+	// its stats appear. Any other stats object takes them once it exists:
+	// monitor->UpdateAttachments({ ... }) on the monitor GetOutboundRtpMonitor(ssrc) etc. return.
+	peerConnection->SetDataChannelAttachments(
+	  1,
+	  {
+	    { "dataProducerId", "data-producer-1" }
+  });
 
 	/* Track context: what the stats cannot show. Declarable before the track appears. */
 

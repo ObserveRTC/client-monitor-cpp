@@ -682,6 +682,29 @@ namespace observertc::clientmonitor
 		}
 	}
 
+	void PeerConnectionMonitor::SetDataChannelAttachments(
+	  int64_t dataChannelIdentifier, const json& attachments)
+	{
+		std::lock_guard<std::recursive_mutex> lock(this->parent->GetMutex());
+
+		this->dataChannelAttachments[dataChannelIdentifier] = attachments;
+
+		for (auto& [id, monitor] : this->dataChannels)
+		{
+			if (monitor->GetStats().dataChannelIdentifier == dataChannelIdentifier)
+			{
+				monitor->UpdateAttachments(attachments);
+			}
+		}
+	}
+
+	void PeerConnectionMonitor::RemoveDataChannelAttachments(int64_t dataChannelIdentifier)
+	{
+		std::lock_guard<std::recursive_mutex> lock(this->parent->GetMutex());
+
+		this->dataChannelAttachments.erase(dataChannelIdentifier);
+	}
+
 	void PeerConnectionMonitor::SetConnectionState(const std::string& state)
 	{
 		std::lock_guard<std::recursive_mutex> lock(this->parent->GetMutex());
@@ -1277,6 +1300,16 @@ namespace observertc::clientmonitor
 		if (!monitor)
 		{
 			auto created = std::make_unique<DataChannelMonitor>(this, stats);
+
+			if (stats.dataChannelIdentifier)
+			{
+				auto it = this->dataChannelAttachments.find(*stats.dataChannelIdentifier);
+
+				if (it != this->dataChannelAttachments.end())
+				{
+					created->UpdateAttachments(it->second);
+				}
+			}
 
 			monitor = created.get();
 			this->dataChannels.emplace(stats.id, std::move(created));

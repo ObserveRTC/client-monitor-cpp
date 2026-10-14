@@ -5,6 +5,8 @@
 #include "clientmonitor/libwebrtc/LibWebRtcBinding.hpp"
 #include "clientmonitor/schema/ClientEventTypes.hpp"
 
+#include <optional>
+
 using json = nlohmann::json;
 
 namespace observertc::clientmonitor
@@ -27,6 +29,19 @@ namespace observertc::clientmonitor
 
 				return std::make_shared<libwebrtc::WebRtcMediaTrack>(
 				  webrtc::scoped_refptr<webrtc::MediaStreamTrackInterface>(track));
+			}
+
+			/** The SCTP stream id: what the RTCDataChannel stats call `dataChannelIdentifier`. */
+			std::optional<int64_t> StreamIdOf(const json& sctpStreamParameters)
+			{
+				auto it = sctpStreamParameters.find("streamId");
+
+				if (it == sctpStreamParameters.end() || !it->is_number_integer())
+				{
+					return std::nullopt;
+				}
+
+				return it->get<int64_t>();
 			}
 		} // namespace
 
@@ -85,8 +100,30 @@ namespace observertc::clientmonitor
 			this->transportId = transport->GetId();
 			this->collector   = std::make_shared<TransportStatsCollector>(transport);
 
-			auto* monitor = this->clientMonitor->AddPeerConnection(
-			  this->collector, this->transportId, this->attachments);
+			// What the web client's monitor attaches from transport.direction. The application's
+			// own attachments win on a clash.
+			if (dynamic_cast<::mediasoupclient::SendTransport*>(transport))
+			{
+				this->direction = "send";
+			}
+			else if (dynamic_cast<::mediasoupclient::RecvTransport*>(transport))
+			{
+				this->direction = "recv";
+			}
+
+			json attachments = json::object();
+
+			if (!this->direction.empty())
+			{
+				attachments["direction"] = this->direction;
+			}
+			if (this->attachments.is_object())
+			{
+				attachments.merge_patch(this->attachments);
+			}
+
+			auto* monitor =
+			  this->clientMonitor->AddPeerConnection(this->collector, this->transportId, attachments);
 
 			this->FireEvent(ClientEventTypes::PEER_CONNECTION_OPENED, json::object());
 
@@ -104,6 +141,10 @@ namespace observertc::clientmonitor
 			this->collector->Detach();
 			this->clientMonitor->RemovePeerConnection(this->transportId);
 			this->collector.reset();
+
+			std::lock_guard<std::recursive_mutex> lock(this->clientMonitor->GetMutex());
+
+			this->producerTracks.clear();
 		}
 
 		PeerConnectionMonitor* TransportMonitor::GetPeerConnectionMonitor() const
@@ -125,34 +166,70 @@ namespace observertc::clientmonitor
       });
 		}
 
-		void TransportMonitor::OnProducerCreated(::mediasoupclient::Producer* producer)
+		void TransportMonitor::TrackProducer(::mediasoupclient::Producer* producer)
 		{
-			const auto trackId = TrackIdOf(producer->GetTrack());
+			// Everything that asks the track (IsPaused() is !track->enabled(), proxied to the
+			// signaling thread) runs before the monitor's lock is taken: the signaling thread may be
+			// waiting for that lock to report a state change.
+			const auto producerId = producer->GetId();
+			const auto trackId    = TrackIdOf(producer->GetTrack());
+			const bool paused     = producer->IsPaused();
+			auto track            = Wrap(producer->GetTrack());
+			std::string endedTrackId;
 
-			if (auto* monitor = this->GetPeerConnectionMonitor())
 			{
-				if (auto track = Wrap(producer->GetTrack()))
+				std::lock_guard<std::recursive_mutex> lock(this->clientMonitor->GetMutex());
+				auto previous = this->producerTracks.find(producerId);
+
+				if (previous != this->producerTracks.end())
 				{
-					monitor->AddMediaTrack(
-					  track,
-					  {
-					    { "producerId", producer->GetId() }
-          });
+					if (previous->second == trackId)
+					{
+						return;
+					}
+
+					endedTrackId = previous->second;
+					this->producerTracks.erase(previous);
+				}
+				if (!trackId.empty())
+				{
+					this->producerTracks[producerId] = trackId;
 				}
 			}
-			if (!trackId.empty())
-			{
-				OutboundTrackContext context;
 
-				context.paused = producer->IsPaused();
-				this->clientMonitor->SetOutboundTrackContext(trackId, context);
+			auto* monitor = this->GetPeerConnectionMonitor();
+
+			if (monitor && !endedTrackId.empty())
+			{
+				monitor->OnMediaTrackEnded(endedTrackId);
+			}
+			if (trackId.empty())
+			{
+				return;
+			}
+			if (monitor && track)
+			{
+				monitor->AddMediaTrack(
+				  track,
+				  {
+				    { "producerId", producerId }
+        });
 			}
 
+			OutboundTrackContext context;
+
+			context.paused = paused;
+			this->clientMonitor->SetOutboundTrackContext(trackId, context);
+		}
+
+		void TransportMonitor::OnProducerCreated(::mediasoupclient::Producer* producer)
+		{
+			this->TrackProducer(producer);
 			this->FireEvent(
 			  ClientEventTypes::PRODUCER_ADDED,
 			  {
-			    { "producerId", producer->GetId() },
-          { "trackId",    trackId           }
+			    { "producerId", producer->GetId()               },
+          { "trackId",    TrackIdOf(producer->GetTrack()) }
       });
 		}
 
@@ -188,33 +265,49 @@ namespace observertc::clientmonitor
 
 		void TransportMonitor::OnProducerTrackReplaced(::mediasoupclient::Producer* producer)
 		{
-			if (auto* monitor = this->GetPeerConnectionMonitor())
-			{
-				if (auto track = Wrap(producer->GetTrack()))
-				{
-					monitor->AddMediaTrack(
-					  track,
-					  {
-					    { "producerId", producer->GetId() }
-          });
-				}
-			}
+			// The track id changes, the producer id does not: the new track carries the same
+			// producerId attachment, and the old one is dropped.
+			this->TrackProducer(producer);
 		}
 
 		void TransportMonitor::OnProducerClosed(::mediasoupclient::Producer* producer)
 		{
-			const auto trackId = TrackIdOf(producer->GetTrack());
+			const auto producerId = producer->GetId();
+			std::string trackId;
 
+			{
+				std::lock_guard<std::recursive_mutex> lock(this->clientMonitor->GetMutex());
+				auto it = this->producerTracks.find(producerId);
+
+				if (it != this->producerTracks.end())
+				{
+					trackId = it->second;
+					this->producerTracks.erase(it);
+				}
+			}
+			if (trackId.empty())
+			{
+				trackId = TrackIdOf(producer->GetTrack());
+			}
 			if (auto* monitor = this->GetPeerConnectionMonitor())
 			{
 				monitor->OnMediaTrackEnded(trackId);
+			}
+			if (!trackId.empty())
+			{
+				this->FireTrackRemoved(
+				  trackId,
+				  producer->GetTrack(),
+				  {
+				    { "producerId", producerId }
+        });
 			}
 
 			this->FireEvent(
 			  ClientEventTypes::PRODUCER_REMOVED,
 			  {
-			    { "producerId", producer->GetId() },
-          { "trackId",    trackId           }
+			    { "producerId", producerId },
+          { "trackId",    trackId    }
       });
 		}
 
@@ -282,13 +375,37 @@ namespace observertc::clientmonitor
       });
 		}
 
+		void TransportMonitor::OnConsumerProducerPaused(::mediasoupclient::Consumer* consumer)
+		{
+			InboundTrackContext context;
+
+			context.remoteOutboundTrackPaused = true;
+			this->clientMonitor->SetInboundTrackContext(TrackIdOf(consumer->GetTrack()), context);
+		}
+
+		void TransportMonitor::OnConsumerProducerResumed(::mediasoupclient::Consumer* consumer)
+		{
+			InboundTrackContext context;
+
+			context.remoteOutboundTrackPaused = false;
+			this->clientMonitor->SetInboundTrackContext(TrackIdOf(consumer->GetTrack()), context);
+		}
+
 		void TransportMonitor::OnConsumerClosed(::mediasoupclient::Consumer* consumer)
 		{
 			const auto trackId = TrackIdOf(consumer->GetTrack());
+			const json attachments{
+				{ "producerId", consumer->GetProducerId() },
+        { "consumerId", consumer->GetId()         }
+			};
 
 			if (auto* monitor = this->GetPeerConnectionMonitor())
 			{
 				monitor->OnMediaTrackEnded(trackId);
+			}
+			if (!trackId.empty())
+			{
+				this->FireTrackRemoved(trackId, consumer->GetTrack(), attachments);
 			}
 
 			this->FireEvent(
@@ -302,6 +419,18 @@ namespace observertc::clientmonitor
 
 		void TransportMonitor::OnDataProducerCreated(::mediasoupclient::DataProducer* dataProducer)
 		{
+			if (auto streamId = StreamIdOf(dataProducer->GetSctpStreamParameters()))
+			{
+				if (auto* monitor = this->GetPeerConnectionMonitor())
+				{
+					monitor->SetDataChannelAttachments(
+					  *streamId,
+					  {
+					    { "dataProducerId", dataProducer->GetId() }
+          });
+				}
+			}
+
 			this->FireEvent(
 			  ClientEventTypes::DATA_PRODUCER_CREATED,
 			  {
@@ -311,6 +440,14 @@ namespace observertc::clientmonitor
 
 		void TransportMonitor::OnDataProducerClosed(::mediasoupclient::DataProducer* dataProducer)
 		{
+			if (auto streamId = StreamIdOf(dataProducer->GetSctpStreamParameters()))
+			{
+				if (auto* monitor = this->GetPeerConnectionMonitor())
+				{
+					monitor->RemoveDataChannelAttachments(*streamId);
+				}
+			}
+
 			this->FireEvent(
 			  ClientEventTypes::DATA_PRODUCER_CLOSED,
 			  {
@@ -320,6 +457,19 @@ namespace observertc::clientmonitor
 
 		void TransportMonitor::OnDataConsumerCreated(::mediasoupclient::DataConsumer* dataConsumer)
 		{
+			if (auto streamId = StreamIdOf(dataConsumer->GetSctpStreamParameters()))
+			{
+				if (auto* monitor = this->GetPeerConnectionMonitor())
+				{
+					monitor->SetDataChannelAttachments(
+					  *streamId,
+					  {
+					    { "dataProducerId", dataConsumer->GetDataProducerId() },
+					    { "dataConsumerId", dataConsumer->GetId()             }
+          });
+				}
+			}
+
 			this->FireEvent(
 			  ClientEventTypes::DATA_CONSUMER_CREATED,
 			  {
@@ -330,6 +480,14 @@ namespace observertc::clientmonitor
 
 		void TransportMonitor::OnDataConsumerClosed(::mediasoupclient::DataConsumer* dataConsumer)
 		{
+			if (auto streamId = StreamIdOf(dataConsumer->GetSctpStreamParameters()))
+			{
+				if (auto* monitor = this->GetPeerConnectionMonitor())
+				{
+					monitor->RemoveDataChannelAttachments(*streamId);
+				}
+			}
+
 			this->FireEvent(
 			  ClientEventTypes::DATA_CONSUMER_CLOSED,
 			  {
@@ -343,6 +501,27 @@ namespace observertc::clientmonitor
 			payload["peerConnectionId"] = this->transportId;
 
 			this->clientMonitor->AddEvent(type, payload);
+		}
+
+		void TransportMonitor::FireTrackRemoved(
+		  const std::string& trackId, ::webrtc::MediaStreamTrackInterface* track, const json& attachments)
+		{
+			// The payload of the web client's MEDIA_TRACK_REMOVED, attachments spread in. Native
+			// tracks have no label, mute state or content hint to report.
+			json payload{
+				{ "trackId", trackId }
+			};
+
+			if (track)
+			{
+				payload["kind"]    = track->kind();
+				payload["enabled"] = track->enabled();
+				payload["readyState"] =
+				  track->state() == ::webrtc::MediaStreamTrackInterface::kEnded ? "ended" : "live";
+			}
+
+			payload.merge_patch(attachments);
+			this->FireEvent(ClientEventTypes::MEDIA_TRACK_REMOVED, std::move(payload));
 		}
 
 		/* MonitoredSendTransportListener */

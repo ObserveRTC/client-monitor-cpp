@@ -75,8 +75,18 @@ per-transport state map), so the rest follow the same pattern.
   single field by passing it as `undefined`.
 - **Timestamps** are kept as `double` milliseconds and written as integers when whole.
 
+- **Mediasoup data channel attachments** are declared by SCTP stream id
+  (`PeerConnectionMonitor::SetDataChannelAttachments`) instead of watched on every stats event;
+  the effect is the same.
+- **Stats monitors keep `attachments`** (`StatsMonitor::GetAttachments()` / `UpdateAttachments()`),
+  stamped onto the entry at sampling time, as the JS monitors' `attachments` property is.
+- **`MEDIA_TRACK_REMOVED`** is sent by the mediasoupclient binding when a producer or consumer is
+  closed (the JS one sends it on the track's `ended` event). libwebrtc has no mute events or track
+  labels, so `MEDIA_TRACK_MUTED` / `_UNMUTED` are not sent and `label` / `contentHint` are absent.
+  libmediasoupclient exposes no ICE gathering state, so `ICE_GATHERING_STATE_CHANGED` is not sent.
+
 ## Untested
 
-The libwebrtc and libmediasoupclient bindings are written against the API libmediasoupclient 3.5
-uses (`webrtc::scoped_refptr`) but have not been compiled here, since that needs a libwebrtc
-build. The core and everything under `test/` build and pass with ASan/UBSan and TSan.
+The libwebrtc and libmediasoupclient bindings are compiled in CI against libmediasoupclient 3.5.0
+and `v3` with a prebuilt libwebrtc m140 (`test/bindings`), but not linked or run: their behaviour
+is untested. The core and everything under `test/` build and pass with ASan/UBSan and TSan.

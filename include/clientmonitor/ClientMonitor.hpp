@@ -250,8 +250,15 @@ namespace observertc::clientmonitor
 		void SetClientId(const std::optional<std::string>& clientId);
 		std::optional<std::string> GetCallId() const;
 		void SetCallId(const std::optional<std::string>& callId);
-		/** Additional data attached to every sample. */
+		/** Additional data attached to every sample (`ClientSample.attachments`). Replaces it. */
 		void SetAttachments(const nlohmann::json& attachments);
+		/**
+		 * Merges `patch` into the sample attachments (RFC 7386 merge patch): keys present are set,
+		 * keys set to null are removed, the rest are kept. For attachments owned by different
+		 * parts of the application, e.g. `{ "senderSideCoupledCongestion": { ... } }` to set one
+		 * and `{ "senderSideCoupledCongestion": null }` to drop it again.
+		 */
+		void UpdateAttachments(const nlohmann::json& patch);
 		nlohmann::json GetAttachments() const;
 		const ClientMonitorConfig& GetConfig() const
 		{
@@ -351,6 +358,11 @@ namespace observertc::clientmonitor
 		  const std::string& type,
 		  const nlohmann::json& payload    = nlohmann::json(),
 		  std::optional<int64_t> timestamp = std::nullopt);
+		/**
+		 * Adds a meta item with every field given, for payloads that are not objects (an SDP
+		 * string with its peerConnectionId, say). A missing timestamp is set to now.
+		 */
+		void AddMetaData(ClientMetaData metaData);
 
 		/* Extension stats. */
 		void AddExtensionStats(const ExtensionStatsInput& stats);

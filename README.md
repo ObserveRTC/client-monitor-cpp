@@ -20,7 +20,7 @@ include(FetchContent)
 FetchContent_Declare(
 	clientmonitor
 	GIT_REPOSITORY https://github.com/ObserveRTC/client-monitor-cpp.git
-	GIT_TAG v0.1.0
+	GIT_TAG v0.2.0
 )
 FetchContent_MakeAvailable(clientmonitor)
 
@@ -36,7 +36,7 @@ Or the release archive, which needs no git on the build machine:
 ```cmake
 FetchContent_Declare(
 	clientmonitor
-	URL https://github.com/ObserveRTC/client-monitor-cpp/releases/download/v0.1.0/client-monitor-cpp.tar.gz
+	URL https://github.com/ObserveRTC/client-monitor-cpp/releases/download/v0.2.0/client-monitor-cpp.tar.gz
 )
 ```
 
@@ -58,16 +58,26 @@ for `URL_HASH`.
 `add_subdirectory(client-monitor-cpp)` on a git submodule works the same way. As a dependency the
 library builds neither its tests nor its examples.
 
-Next to libmediasoupclient, turn the binding on and share libmediasoupclient's json (it ships
-`json.hpp` through libsdptransform), so both libraries compile against the same one:
+Next to libmediasoupclient, add libmediasoupclient first and turn the binding on. That is all:
 
 ```cmake
-add_subdirectory(libmediasoupclient)                # defines the mediasoupclient target
+set(LIBWEBRTC_INCLUDE_PATH /path/to/webrtc/include)   # libmediasoupclient needs these anyway
+set(LIBWEBRTC_BINARY_PATH  /path/to/webrtc/lib)
+add_subdirectory(libmediasoupclient)                  # defines the mediasoupclient target
 
 set(CLIENTMONITOR_MEDIASOUPCLIENT ON)
-set(CLIENTMONITOR_JSON_INCLUDE_PATH ${libsdptransform_SOURCE_DIR}/include)
 FetchContent_MakeAvailable(clientmonitor)
+
+target_link_libraries(my_app PRIVATE clientmonitor::clientmonitor mediasoupclient)
 ```
+
+The binding then compiles against libmediasoupclient's own nlohmann::json (libsdptransform's
+`json.hpp`, found automatically; two copies in one program would be an ODR violation), and picks
+up libwebrtc's headers from `LIBWEBRTC_INCLUDE_PATH` as system headers, so an application building
+with `-Werror` does not trip over libwebrtc's warnings. libwebrtc's headers need clang, as
+libwebrtc itself does. CI compiles both bindings and
+[`examples/mediasoup_client.cpp`](examples/mediasoup_client.cpp), a complete integration, against
+libmediasoupclient 3.5.0 and its `v3` head with libwebrtc m140 (`test/bindings`).
 
 ### Options
 
@@ -77,12 +87,13 @@ FetchContent_MakeAvailable(clientmonitor)
 | `CLIENTMONITOR_BUILD_EXAMPLES` | ON when top level | `examples/basic_monitor` |
 | `CLIENTMONITOR_LIBWEBRTC` | OFF | `bindings/libwebrtc` (needs `LIBWEBRTC_INCLUDE_PATH`, optionally `LIBWEBRTC_BINARY_PATH`) |
 | `CLIENTMONITOR_MEDIASOUPCLIENT` | OFF | `bindings/mediasoupclient` (needs the `mediasoupclient` target; implies the libwebrtc binding) |
-| `CLIENTMONITOR_JSON_INCLUDE_PATH` | "" | A directory with a flat `json.hpp` to use instead of nlohmann_json |
+| `CLIENTMONITOR_JSON_INCLUDE_PATH` | "" | A directory with a flat `json.hpp` to use instead of nlohmann_json. With the libmediasoupclient binding it defaults to libsdptransform's |
 | `CLIENTMONITOR_FETCH_JSON` | ON | Fetch nlohmann_json 3.11.3 when no `nlohmann_json::nlohmann_json` target or package exists |
 | `CLIENTMONITOR_LOG_TRACE` | OFF | `CM_TRACE()` logging |
 
-nlohmann::json is picked in this order: `CLIENTMONITOR_JSON_INCLUDE_PATH`, an existing
-`nlohmann_json::nlohmann_json` target, `find_package(nlohmann_json)`, then a download.
+nlohmann::json is picked in this order: `CLIENTMONITOR_JSON_INCLUDE_PATH` (libsdptransform's when
+the libmediasoupclient binding is on), an existing `nlohmann_json::nlohmann_json` target,
+`find_package(nlohmann_json)`, then a download.
 
 ## Android (Gradle)
 
@@ -124,7 +135,7 @@ project(myapp_native LANGUAGES CXX)
 include(FetchContent)
 FetchContent_Declare(
     clientmonitor
-    URL https://github.com/ObserveRTC/client-monitor-cpp/releases/download/v0.1.0/client-monitor-cpp.tar.gz
+    URL https://github.com/ObserveRTC/client-monitor-cpp/releases/download/v0.2.0/client-monitor-cpp.tar.gz
     # or always the newest release (resolved on the first sync of a build directory only):
     # URL https://github.com/ObserveRTC/client-monitor-cpp/releases/latest/download/client-monitor-cpp.tar.gz
 )
@@ -224,6 +235,8 @@ MyListener listener;
 observertc::clientmonitor::ClientMonitor monitor(config, &listener); // collects every 5s on its own thread
 
 // libmediasoupclient: decorate the transport listener, bind, report producers/consumers.
+// The samples then carry the transport id, direction, producer / consumer / data producer ids
+// as attachments; see docs/USAGE.md#mediasoup-attachments and examples/mediasoup_client.cpp.
 observertc::clientmonitor::mediasoupclient::TransportMonitor transportMonitor(&monitor);
 observertc::clientmonitor::mediasoupclient::MonitoredSendTransportListener sendListener(&transportMonitor, &myListener);
 auto* sendTransport = device.CreateSendTransport(&sendListener, ...);
@@ -307,9 +320,10 @@ threading model rather than from this library.
 
 ### Build and link
 
-- Next to libmediasoupclient, set `CLIENTMONITOR_JSON_INCLUDE_PATH` to libsdptransform's include
-  directory so the two libraries share one nlohmann::json. Two different copies in one binary is an
-  ODR violation that may only show up as crashes.
+- Next to libmediasoupclient the two libraries must share one nlohmann::json; two different copies
+  in one binary is an ODR violation that may only show up as crashes. With
+  `CLIENTMONITOR_MEDIASOUPCLIENT` on, libsdptransform's `json.hpp` is used automatically; set
+  `CLIENTMONITOR_JSON_INCLUDE_PATH` yourself only if libmediasoupclient gets its json elsewhere.
 - The libwebrtc binding must be compiled against the same libwebrtc headers, defines and standard
   library as the application's libwebrtc build.
 - Nothing is logged until a handler is set: `observertc::clientmonitor::Logger::SetDefaultHandler()` (stdout)

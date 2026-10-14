@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.14)
 
 project(clientmonitor
-	VERSION 0.1.0
+	VERSION 0.2.0
 	DESCRIPTION "ObserveRTC client monitor for native WebRTC (libwebrtc / libmediasoupclient)"
 	HOMEPAGE_URL "https://github.com/ObserveRTC/client-monitor-cpp"
 	LANGUAGES CXX
@@ -41,6 +41,40 @@ set(CLIENTMONITOR_JSON_INCLUDE_PATH "" CACHE STRING "Directory with an existing 
 
 if(CLIENTMONITOR_MEDIASOUPCLIENT)
 	set(CLIENTMONITOR_LIBWEBRTC ON)
+
+	# libmediasoupclient's headers include libsdptransform's flat <json.hpp>. Compiling the
+	# binding against any other nlohmann::json would put two versions of the same classes in
+	# one program, so default to that one. libsdptransform is fetched inside libmediasoupclient's
+	# directory scope, where its *_SOURCE_DIR variable is not visible from here; its FetchContent
+	# properties are global.
+	if(NOT CLIENTMONITOR_JSON_INCLUDE_PATH)
+		FetchContent_GetProperties(libsdptransform SOURCE_DIR CLIENTMONITOR_SDPTRANSFORM_DIR)
+
+		if(CLIENTMONITOR_SDPTRANSFORM_DIR AND EXISTS "${CLIENTMONITOR_SDPTRANSFORM_DIR}/include/json.hpp")
+			set(CLIENTMONITOR_JSON_INCLUDE_PATH "${CLIENTMONITOR_SDPTRANSFORM_DIR}/include")
+		elseif(TARGET mediasoupclient)
+			# libmediasoupclient lists libsdptransform's include directory among its public ones.
+			get_target_property(CLIENTMONITOR_MSC_INCLUDES mediasoupclient INTERFACE_INCLUDE_DIRECTORIES)
+
+			foreach(dir IN LISTS CLIENTMONITOR_MSC_INCLUDES)
+				if(dir AND NOT dir MATCHES "\\$<" AND EXISTS "${dir}/json.hpp")
+					set(CLIENTMONITOR_JSON_INCLUDE_PATH "${dir}")
+					break()
+				endif()
+			endforeach()
+		endif()
+
+		if(NOT CLIENTMONITOR_JSON_INCLUDE_PATH)
+			message(WARNING
+				"CLIENTMONITOR_MEDIASOUPCLIENT is ON but libsdptransform's json.hpp was not found. "
+				"Set CLIENTMONITOR_JSON_INCLUDE_PATH to the directory holding it, so the binding and "
+				"libmediasoupclient compile against the same nlohmann::json.")
+		endif()
+	endif()
+endif()
+
+if(CLIENTMONITOR_JSON_INCLUDE_PATH AND NOT EXISTS "${CLIENTMONITOR_JSON_INCLUDE_PATH}/json.hpp")
+	message(FATAL_ERROR "CLIENTMONITOR_JSON_INCLUDE_PATH (${CLIENTMONITOR_JSON_INCLUDE_PATH}) has no json.hpp")
 endif()
 
 message(STATUS "client-monitor-cpp ${PROJECT_VERSION}")
@@ -159,7 +193,9 @@ if(CLIENTMONITOR_LIBWEBRTC)
 	endif()
 
 	if(LIBWEBRTC_INCLUDE_PATH)
-		target_include_directories(clientmonitor PUBLIC
+		# SYSTEM: libwebrtc's and abseil's headers do not build warning-free under -Wextra
+		# -Wpedantic, and an application compiling with -Werror must not fail on them.
+		target_include_directories(clientmonitor SYSTEM PUBLIC
 			"${LIBWEBRTC_INCLUDE_PATH}"
 			"${LIBWEBRTC_INCLUDE_PATH}/third_party/abseil-cpp"
 		)

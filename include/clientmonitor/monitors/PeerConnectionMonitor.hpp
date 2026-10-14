@@ -181,6 +181,16 @@ namespace observertc::clientmonitor
 		 */
 		void OnMediaTrackEnded(const std::string& trackId);
 
+		/**
+		 * Attachments for the data channel whose `dataChannelIdentifier` (the SCTP stream id) is
+		 * `dataChannelIdentifier`, merged into it now if its stats are already known and when they
+		 * first appear otherwise. This is how a mediasoup data producer or consumer is bound to its
+		 * RTCDataChannel stats: `sctpStreamParameters.streamId` is the identifier.
+		 */
+		void SetDataChannelAttachments(int64_t dataChannelIdentifier, const nlohmann::json& attachments);
+		/** Stops attaching to channels that appear later under the identifier (it can be reused). */
+		void RemoveDataChannelAttachments(int64_t dataChannelIdentifier);
+
 		/** The RTCPeerConnection's `connectionState`, as reported by the binding. */
 		void SetConnectionState(const std::string& state);
 		const std::optional<std::string>& GetConnectionState() const
@@ -365,6 +375,7 @@ namespace observertc::clientmonitor
 		std::map<std::string, std::unique_ptr<IceCandidatePairMonitor>> iceCandidatePairs;
 		std::map<std::string, std::unique_ptr<CertificateMonitor>> certificates;
 		std::map<std::string, PendingTrack> pendingTracks;
+		std::map<int64_t, nlohmann::json> dataChannelAttachments;
 		std::map<std::string, std::unique_ptr<InboundTrackMonitor>> inboundTracks;
 		std::map<std::string, std::unique_ptr<OutboundTrackMonitor>> outboundTracks;
 	};

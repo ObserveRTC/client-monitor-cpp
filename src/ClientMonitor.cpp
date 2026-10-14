@@ -120,6 +120,13 @@ namespace observertc::clientmonitor
 		this->attachments = attachments;
 	}
 
+	void ClientMonitor::UpdateAttachments(const json& patch)
+	{
+		std::lock_guard<std::recursive_mutex> lock(this->mutex);
+
+		this->attachments.merge_patch(patch);
+	}
+
 	json ClientMonitor::GetAttachments() const
 	{
 		std::lock_guard<std::recursive_mutex> lock(this->mutex);
@@ -716,6 +723,22 @@ namespace observertc::clientmonitor
 			{
 				metaData.trackId = id;
 			}
+		}
+
+		this->AddMetaData(std::move(metaData));
+	}
+
+	void ClientMonitor::AddMetaData(ClientMetaData metaData)
+	{
+		std::lock_guard<std::recursive_mutex> lock(this->mutex);
+
+		if (this->closed || !this->IsBuffering())
+		{
+			return;
+		}
+		if (!metaData.timestamp)
+		{
+			metaData.timestamp = utils::NowMs();
 		}
 
 		this->clientMetaItems.push_back(metaData);
