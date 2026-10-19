@@ -1,55 +1,114 @@
 name: Release
 
-# Push a vX.Y.Z tag to publish a GitHub release with a source archive under a fixed name, so
-# applications can fetch either one version or always the latest:
-#   https://github.com/ObserveRTC/client-monitor-cpp/releases/download/vX.Y.Z/client-monitor-cpp.tar.gz
-#   https://github.com/ObserveRTC/client-monitor-cpp/releases/latest/download/client-monitor-cpp.tar.gz
+# Run from the Actions tab (Release → Run workflow) with a version, X.Y.Z. On main it:
+#   1. prepares the release with scripts/prepare-release.sh: VERSION in CMakeLists.txt, the
+#      `## Unreleased` section of CHANGELOG.md renamed to `## X.Y.Z`, the README pins;
+#   2. builds and tests that tree, and runs the examples;
+#   3. commits the change to main, if there is one;
+#   4. publishes the GitHub release vX.Y.Z (creating the tag) with the CHANGELOG section as notes
+#      and a source archive under a fixed name, so applications can fetch either one version or
+#      always the latest:
+#        https://github.com/ObserveRTC/client-monitor-cpp/releases/download/vX.Y.Z/client-monitor-cpp.tar.gz
+#        https://github.com/ObserveRTC/client-monitor-cpp/releases/latest/download/client-monitor-cpp.tar.gz
+# With "dry run" it stops after step 2 and only shows what it would release.
+#
+# If main is protected against direct pushes, add a token that may push to it as the repository
+# secret RELEASE_TOKEN; otherwise the workflow's own token is used.
 
 on:
-  push:
-    tags: ["v*.*.*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release, X.Y.Z (without the v)"
+        required: true
+        type: string
+      dry_run:
+        description: "Dry run: prepare, build and test, but commit and publish nothing"
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: write
 
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
   release:
     runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ inputs.version }}
+      TAG: v${{ inputs.version }}
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Check the tag matches the CMake version
+      - name: Only from main
+        if: github.ref != 'refs/heads/main'
         run: |
-          tag="${GITHUB_REF_NAME#v}"
-          version="$(sed -n 's/^[[:space:]]*VERSION[[:space:]]\+\([0-9.]\+\).*/\1/p' CMakeLists.txt | head -n 1)"
-          echo "tag ${tag}, CMakeLists.txt ${version}"
-          test "${tag}" = "${version}"
+          echo "Run the release from main, not ${GITHUB_REF}."
+          exit 1
+
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          token: ${{ secrets.RELEASE_TOKEN || github.token }}
+
+      - name: Check the version is not released yet
+        run: |
+          if git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null; then
+            echo "Tag ${TAG} already exists."
+            exit 1
+          fi
+
+      - name: Prepare the release
+        run: scripts/prepare-release.sh "${VERSION}" release-notes.md
+
+      - name: Show the changes and the notes
+        run: |
+          git --no-pager diff --stat
+          git --no-pager diff
+          echo "----- release notes -----"
+          cat release-notes.md
 
       - name: Build and test
         run: |
           cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_COMPILE_WARNING_AS_ERROR=ON
           cmake --build build --parallel
           ctest --test-dir build --output-on-failure
+          ./build/examples/basic_monitor
+          ./build/examples/api_tour
+
+      - name: Commit to main
+        if: ${{ !inputs.dry_run }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add CMakeLists.txt CHANGELOG.md README.md
+
+          if git diff --cached --quiet; then
+            echo "Nothing to commit: CMakeLists.txt, CHANGELOG.md and README.md are already at ${VERSION}."
+          else
+            git commit -m "client-monitor-cpp ${VERSION}"
+            git push origin HEAD:main
+          fi
+
+          echo "SHA=$(git rev-parse HEAD)" >> "${GITHUB_ENV}"
 
       - name: Package
+        if: ${{ !inputs.dry_run }}
         run: |
-          git archive --format=tar.gz --prefix=client-monitor-cpp/ -o client-monitor-cpp.tar.gz "${GITHUB_REF_NAME}"
+          git archive --format=tar.gz --prefix=client-monitor-cpp/ -o client-monitor-cpp.tar.gz "${SHA}"
           sha256sum client-monitor-cpp.tar.gz > client-monitor-cpp.tar.gz.sha256
           cat client-monitor-cpp.tar.gz.sha256
 
-      - name: Release notes from CHANGELOG.md
-        run: |
-          awk -v version="${GITHUB_REF_NAME#v}" '
-            $0 ~ "^## " { if (found) exit; if ($2 == version) { found = 1; next } }
-            found { print }
-          ' CHANGELOG.md > notes.md
-          test -s notes.md || { echo "CHANGELOG.md has no '## ${GITHUB_REF_NAME#v}' section"; exit 1; }
-
       - name: Publish
+        if: ${{ !inputs.dry_run }}
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
         run: |
-          gh release create "${GITHUB_REF_NAME}" \
+          gh release create "${TAG}" \
             client-monitor-cpp.tar.gz client-monitor-cpp.tar.gz.sha256 \
-            --title "client-monitor-cpp ${GITHUB_REF_NAME}" \
-            --notes-file notes.md
+            --target "${SHA}" \
+            --title "client-monitor-cpp ${TAG}" \
+            --notes-file release-notes.md

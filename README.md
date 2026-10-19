@@ -383,13 +383,19 @@ application already built on libmediasoupclient finds the API familiar. New code
 
 ## Releasing
 
-1. Bump `VERSION` in `project(...)` in `CMakeLists.txt` and add a `## X.Y.Z` section to
-   `CHANGELOG.md`.
-2. Commit, then tag and push: `git tag -a v0.3.0 -m "client-monitor-cpp 0.3.0" && git push origin main v0.3.0`.
-3. The release workflow checks the tag against `VERSION`, builds and tests, and publishes a GitHub
-   release with `client-monitor-cpp.tar.gz` (and its `.sha256`), using the CHANGELOG section as
-   the notes. It fails, and publishes nothing, if the versions differ or the section is missing.
-4. Applications pinned to a version move by changing the tag in their URL; those on
+1. While working, add notes under `## Unreleased` at the top of `CHANGELOG.md`.
+2. In the Actions tab, run the **Release** workflow on `main` with the version (`X.Y.Z`, without the
+   `v`). Tick "dry run" first to see the changes and the notes it would publish.
+3. The workflow sets `VERSION` in `CMakeLists.txt`, renames `## Unreleased` to `## X.Y.Z` (or keeps
+   an existing `## X.Y.Z` section), points the README pins at `vX.Y.Z`, builds and tests, commits
+   that to `main`, and publishes the GitHub release `vX.Y.Z` (creating the tag) with
+   `client-monitor-cpp.tar.gz` and its `.sha256`, using the CHANGELOG section as the notes. It
+   refuses a version that is not `X.Y.Z`, lower than the current one or already tagged, and one with
+   no notes, and then publishes nothing. `scripts/prepare-release.sh X.Y.Z` does the file changes
+   locally.
+4. If `main` does not accept direct pushes, store a token that may push to it as the repository
+   secret `RELEASE_TOKEN`.
+5. Applications pinned to a version move by changing the tag in their URL; those on
    `releases/latest` pick it up on their next clean configure.
 
 ## License

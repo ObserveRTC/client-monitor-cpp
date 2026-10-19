@@ -1,7 +1,8 @@
 # Changelog
 
 All notable changes to client-monitor-cpp. Versions follow [Semantic Versioning](https://semver.org/);
-the version lives in `project(... VERSION ...)` in `CMakeLists.txt` and is tagged as `vX.Y.Z`.
+the version lives in `project(... VERSION ...)` in `CMakeLists.txt` and is tagged as `vX.Y.Z`. New notes go
+under `## Unreleased`; the Release workflow turns it into the version's section.
 
 ## 0.3.0
 
