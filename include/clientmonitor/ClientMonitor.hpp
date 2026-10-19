@@ -68,6 +68,16 @@ namespace observertc::clientmonitor
 			virtual void OnSampleCreated(ClientMonitor* /*clientMonitor*/, const ClientSample& /*sample*/)
 			{
 			}
+			/**
+			 * A peer connection's report as its StatsCollector (or PeerConnectionMonitor::Accept())
+			 * delivered it, before the stats adapters run.
+			 */
+			virtual void OnRawStats(
+			  ClientMonitor* /*clientMonitor*/,
+			  const std::string& /*peerConnectionId*/,
+			  const nlohmann::json& /*rawStats*/)
+			{
+			}
 			virtual void OnStatsCollected(ClientMonitor* /*clientMonitor*/, const StatsCollectedEvent& /*event*/)
 			{
 			}
@@ -308,8 +318,7 @@ namespace observertc::clientmonitor
 
 		/**
 		 * Starts monitoring a peer connection whose stats come from `statsCollector`. An empty id
-		 * gets a generated UUID. Adds a libwebrtc stats adapter by default, since native stats are
-		 * Chromium's. Returns nullptr when closed or when the id is already monitored.
+		 * gets a generated UUID. Returns nullptr when closed or when the id is already monitored.
 		 */
 		PeerConnectionMonitor* AddPeerConnection(
 		  std::shared_ptr<StatsCollector> statsCollector,
@@ -317,6 +326,20 @@ namespace observertc::clientmonitor
 		  const nlohmann::json& attachments   = nlohmann::json());
 		/** Closes and drops the peer connection monitor. */
 		bool RemovePeerConnection(const std::string& peerConnectionId);
+
+		/* Stats adapters. */
+
+		/**
+		 * Adds an adapter that brings every peer connection's raw report to W3C shape. Collect()
+		 * takes each peer connection's raw report, reports it through Listener::OnRawStats(), runs
+		 * the adapters on it in the order they were added, and then hands it to the peer connection
+		 * monitor. The client monitor starts with a LibWebRtcStatsAdapter, since native stats are
+		 * Chromium's. An adapter whose name is already added is ignored.
+		 */
+		void AddStatsAdapter(std::unique_ptr<StatsAdapter> adapter);
+		bool RemoveStatsAdapter(const std::string& name);
+		/** The adapter added under `name`, or null. Owned by the client monitor: use it under GetMutex(). */
+		StatsAdapter* GetStatsAdapter(const std::string& name) const;
 
 		/* Events, issues, meta. */
 		void AddEvent(
@@ -443,6 +466,10 @@ namespace observertc::clientmonitor
 		std::optional<InboundTrackContext> TakePendingInboundTrackContext(const std::string& trackId);
 		std::optional<OutboundTrackContext> TakePendingOutboundTrackContext(const std::string& trackId);
 		void DropClosedPeerConnections();
+		/** PeerConnectionMonitor::Accept(): adapts an application's report and accepts it. */
+		void AcceptStats(const std::string& peerConnectionId, nlohmann::json rawStats);
+		/** Reports `rawStats`, adapts it and hands it to `peerConnection`. Under the lock. */
+		nlohmann::json AdaptAndAccept(PeerConnectionMonitor& peerConnection, nlohmann::json rawStats);
 
 		/* Pure virtual methods inherited from IssueRegistrySink: the end of the issue chain. */
 	private:
@@ -458,6 +485,7 @@ namespace observertc::clientmonitor
 		bool closed{ false };
 		std::vector<Listener*> listeners;
 		IntervalTimer timer;
+		std::vector<std::unique_ptr<StatsAdapter>> statsAdapters;
 
 		nlohmann::json attachments;
 		Metrics metrics;

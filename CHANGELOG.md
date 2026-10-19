@@ -1,7 +1,63 @@
 # Changelog
 
 All notable changes to client-monitor-cpp. Versions follow [Semantic Versioning](https://semver.org/);
-the version lives in `project(... VERSION ...)` in `CMakeLists.txt` and is tagged as `vX.Y.Z`.
+the version lives in `project(... VERSION ...)` in `CMakeLists.txt` and is tagged as `vX.Y.Z`. New notes go
+under `## Unreleased`; the Release workflow turns it into the version's section.
+
+## 0.3.0
+
+Outbound tracks bind to the streams their sender sends now, also when libwebrtc keeps reporting
+senders that lost their track, and libwebrtc timestamps are read in milliseconds. Stats adapters
+move to the client monitor.
+
+**Breaking:** stats adapters belong to the client monitor. `PeerConnectionMonitor::AddStatsAdapter()`
+/ `RemoveStatsAdapter()` and `PeerConnectionMonitor::Collect()` are gone; use
+`ClientMonitor::AddStatsAdapter()` / `RemoveStatsAdapter()` / `GetStatsAdapter()`, and
+`ClientMonitor::Collect()`. `StatsAdapter::Adapt()` takes the peer connection id:
+`Adapt(peerConnectionId, stats)`.
+
+- `ClientMonitor::Collect()` takes every peer connection's raw report, reports it through the new
+  `Listener::OnRawStats()`, runs the adapters, then hands the adapted report to the peer connection
+  monitor. `PeerConnectionMonitor::Accept()` takes the same path; `GetRawStats()` returns the
+  collector's report. The client monitor starts with a `LibWebRtcStatsAdapter`.
+- `LibWebRtcStatsAdapter` converts microsecond timestamps (libwebrtc's `RTCStatsReport::ToJson()`)
+  to milliseconds. Before, every elapsed time read 1000 times too long: rates were 1000 times too
+  low, and millisecond thresholds such as the dry detectors' were crossed after one collection. The
+  timestamps in the samples are milliseconds now too (see "Sample timestamps" below).
+- `DetachedSenderStatsAdapter`: removes `mediaSourceId` from the `outbound-rtp` entries of senders
+  that carry no track, as W3C stats have it; libwebrtc keeps reporting such senders with a stale
+  reference. Told per peer connection and by `mid`; the entries stay in the report.
+- The mediasoupclient binding adds it to the client monitor for send transports and tells it, by
+  transport id and `mid`, which producers' senders carry a track (created, track replaced, closed).
+- Outbound tracks re-read their `outbound-rtp` streams from `mediaSourceId` on every report, also
+  when a report repeats its timestamp, and take the media source a stream references when several
+  carry the track's id. `dry-outbound-track` is no longer raised for a sending track bound to a
+  closed sender's streams.
+- A new outbound track with the id of an ended one starts a new monitor, instead of being ignored
+  while the ended one's streams, attachments and detector state stay.
+
+### Sample timestamps
+
+**Changed for sample consumers:** the `timestamp` of every stats object inside
+`peerConnections[]` (`outboundRtps`, `inboundRtps`, `remoteInboundRtps`, `remoteOutboundRtps`,
+`mediaSources`, `mediaPlayouts`, `codecs`, `dataChannels`, `peerConnectionTransports`,
+`iceTransports`, `iceCandidates`, `iceCandidatePairs`, `certificates`) is now in milliseconds since
+the epoch, as in samples from a browser.
+
+- Up to 0.2.0 these were microseconds, as libwebrtc reports them: an `outbound-rtp` at
+  `1792044664814755` next to a sample `timestamp` of `1792044676463`. From 0.3.0 the same entry
+  reads `1792044664814.755`.
+- Unchanged, and always milliseconds: the sample-level `timestamp`, `clientEvents[].timestamp`,
+  `clientIssues[].timestamp` and `clientMetaItems[].timestamp`.
+- Applications on 0.2.0 or earlier stay in use for a while, so a consumer receives both units at
+  once. The unit can be told from the value itself: an epoch timestamp above `1e14` cannot be
+  milliseconds (that is the year 5138), so it is microseconds and divides by 1000; anything lower
+  is milliseconds. Reading the unit per value keeps both working, and does not depend on the
+  client's platform or library version.
+- Everything derived from stats timestamps is affected: elapsed times and the rates computed from
+  them (bitrate, packet rate, frame rate), time axes, gap detection, and ordering stats against
+  events and issues. A consumer that already reads microseconds for these clients should read the
+  unit per value instead, so 0.3.0 samples are not read 1000 times too short.
 
 ## 0.2.0
 

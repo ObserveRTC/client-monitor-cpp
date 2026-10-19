@@ -371,6 +371,11 @@ namespace observertc::clientmonitor
 
 		if (!elapsed.has_value())
 		{
+			// Nothing to derive from a report whose clock did not move, but its media source
+			// reference is current: libwebrtc keeps reporting a sender whose track was removed
+			// with the timestamp of its last report, and the reference is what binds it to a track.
+			this->stats.mediaSourceId = next.mediaSourceId;
+
 			return;
 		}
 

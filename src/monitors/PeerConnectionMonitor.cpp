@@ -128,99 +128,16 @@ namespace observertc::clientmonitor
 		this->outboundTracks.clear();
 	}
 
-	json PeerConnectionMonitor::Collect()
+	json PeerConnectionMonitor::GetRawStats()
 	{
 		CM_TRACE();
 
-		json stats = this->statsCollector ? this->statsCollector->GetStats() : json::array();
-
-		std::lock_guard<std::recursive_mutex> lock(this->parent->GetMutex());
-
-		if (this->closed)
-		{
-			return json::array();
-		}
-
-		for (auto& adapter : this->statsAdapters)
-		{
-			try
-			{
-				adapter->Adapt(stats);
-			}
-			catch (const std::exception& error)
-			{
-				CM_WARN("error adapting stats with %s: %s", adapter->GetName().c_str(), error.what());
-			}
-		}
-
-		this->AcceptAdaptedStats(stats);
-
-		return stats;
+		return this->statsCollector ? this->statsCollector->GetStats() : json::array();
 	}
 
 	void PeerConnectionMonitor::Accept(json stats)
 	{
-		std::lock_guard<std::recursive_mutex> lock(this->parent->GetMutex());
-
-		if (this->closed)
-		{
-			return;
-		}
-
-		for (auto& adapter : this->statsAdapters)
-		{
-			try
-			{
-				adapter->Adapt(stats);
-			}
-			catch (const std::exception& error)
-			{
-				CM_WARN("error adapting stats with %s: %s", adapter->GetName().c_str(), error.what());
-			}
-		}
-
-		this->AcceptAdaptedStats(stats);
-	}
-
-	void PeerConnectionMonitor::AddStatsAdapter(std::unique_ptr<StatsAdapter> adapter)
-	{
-		std::lock_guard<std::recursive_mutex> lock(this->parent->GetMutex());
-
-		if (!adapter)
-		{
-			return;
-		}
-
-		for (const auto& existing : this->statsAdapters)
-		{
-			if (existing->GetName() == adapter->GetName())
-			{
-				CM_WARN("adapter with name %s already exists", adapter->GetName().c_str());
-
-				return;
-			}
-		}
-
-		this->statsAdapters.push_back(std::move(adapter));
-	}
-
-	bool PeerConnectionMonitor::RemoveStatsAdapter(const std::string& name)
-	{
-		std::lock_guard<std::recursive_mutex> lock(this->parent->GetMutex());
-
-		const auto size = this->statsAdapters.size();
-
-		this->statsAdapters.erase(
-		  std::remove_if(
-		    this->statsAdapters.begin(),
-		    this->statsAdapters.end(),
-		    [&name](const std::unique_ptr<StatsAdapter>& adapter)
-		    {
-			    return adapter->GetName() == name;
-		    }),
-		  this->statsAdapters.end());
-
-		return size != this->statsAdapters.size();
+		this->parent->AcceptStats(this->peerConnectionId, std::move(stats));
 	}
 
 	void PeerConnectionMonitor::AcceptAdaptedStats(const json& stats)
@@ -639,13 +556,29 @@ namespace observertc::clientmonitor
 		}
 
 		const auto trackId = track->GetId();
+		MediaSourceMonitor* mediaSource{ nullptr };
 
-		for (auto* mediaSource : this->GetMediaSources())
+		// Several media sources can carry the track's identifier (a source of a sender that no
+		// longer carries the track is still reported); the one a stream references is the one in
+		// use.
+		for (auto* candidate : this->GetMediaSources())
 		{
-			if (mediaSource->GetStats().trackIdentifier == trackId)
+			if (candidate->GetStats().trackIdentifier != trackId)
 			{
-				return this->CreateOutboundTrackMonitor(track, mediaSource, attachments);
+				continue;
 			}
+			if (!mediaSource || !candidate->GetOutboundRtps().empty())
+			{
+				mediaSource = candidate;
+			}
+			if (!candidate->GetOutboundRtps().empty())
+			{
+				break;
+			}
+		}
+		if (mediaSource)
+		{
+			return this->CreateOutboundTrackMonitor(track, mediaSource, attachments);
 		}
 		for (auto* inboundRtp : this->GetInboundRtps())
 		{
@@ -1148,13 +1081,35 @@ namespace observertc::clientmonitor
 				  l->OnNewOutboundRtpMonitor(this->parent, monitor);
 			  });
 
-			if (auto* track = monitor->GetTrack())
-			{
-				track->outboundRtps[stats.ssrc] = monitor;
-			}
 		}
 
 		monitor->Accept(stats);
+
+		// The stream belongs to the track its media source carries in this report:
+		// `mediaSourceId` changes with replaceTrack() and is absent for a sender without a track.
+		auto* track = monitor->GetTrack();
+
+		for (auto& [trackId, outboundTrack] : this->outboundTracks)
+		{
+			if (outboundTrack.get() == track || !outboundTrack->outboundRtps.erase(stats.ssrc))
+			{
+				continue;
+			}
+			if (outboundTrack->highestLayer == monitor)
+			{
+				outboundTrack->highestLayer = nullptr;
+			}
+		}
+		if (track)
+		{
+			track->outboundRtps[stats.ssrc] = monitor;
+
+			// The media source a stream references is the one its track is captured through now.
+			if (auto* mediaSource = monitor->GetMediaSource())
+			{
+				track->mediaSource = mediaSource;
+			}
+		}
 
 		return monitor;
 	}
@@ -1500,9 +1455,18 @@ namespace observertc::clientmonitor
 	{
 		const auto trackId = track->GetId();
 
-		if (this->outboundTracks.count(trackId))
+		if (auto existing = this->outboundTracks.find(trackId); existing != this->outboundTracks.end())
 		{
-			return;
+			// A new track with the id of one that already ended (a sender closed and another created
+			// with a track of the same id) starts a new monitor: the old one's streams, attachments
+			// and detector state belong to the ended track.
+			if (!existing->second->IsSourceEnded())
+			{
+				return;
+			}
+
+			existing->second->GetIssues().ResolveAll("the track was replaced");
+			this->outboundTracks.erase(existing);
 		}
 
 		auto created  = std::make_unique<OutboundTrackMonitor>(track, mediaSource, attachments);
@@ -1881,7 +1845,9 @@ namespace observertc::clientmonitor
 
 			auto track = this->outboundTracks.find(monitor->GetStats().trackIdentifier.value_or(""));
 
-			if (track != this->outboundTracks.end())
+			// Several sources can carry a track identifier; only the one the track reads from takes
+			// the track with it.
+			if (track != this->outboundTracks.end() && track->second->mediaSource == monitor)
 			{
 				// A source that went away takes its stats entry with it, so the ordinary update
 				// pass would never see the track again; its detectors get their last look here.

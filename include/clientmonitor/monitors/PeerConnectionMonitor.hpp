@@ -158,16 +158,17 @@ namespace observertc::clientmonitor
 			return this->closed;
 		}
 
-		/** Pulls a report from the StatsCollector, adapts it and accepts it. */
-		nlohmann::json Collect();
 		/**
-		 * Accepts a report the application collected itself (a JSON array of W3C stats). Adapted
-		 * first, like a collected one.
+		 * The raw report from the StatsCollector. Takes no lock (the collector may block on the
+		 * thread that owns the peer connection); ClientMonitor::Collect() calls it, then adapts the
+		 * report and hands it back to this monitor.
+		 */
+		nlohmann::json GetRawStats();
+		/**
+		 * Accepts a report the application collected itself (a JSON array of raw stats). It goes
+		 * through the client monitor's adapters first, like a collected one.
 		 */
 		void Accept(nlohmann::json stats);
-
-		void AddStatsAdapter(std::unique_ptr<StatsAdapter> adapter);
-		bool RemoveStatsAdapter(const std::string& name);
 
 		/**
 		 * Starts monitoring a track. Matched to its stats by track id; held pending until the first
@@ -303,6 +304,9 @@ namespace observertc::clientmonitor
 		bool IsBlockedTransport() const;
 
 	private:
+		friend class ClientMonitor;
+
+		/** Updates the monitors from an adapted (W3C) report. Called by the client monitor. */
 		void AcceptAdaptedStats(const nlohmann::json& stats);
 		void UpdateCodec(const nlohmann::json& raw);
 		InboundRtpMonitor* UpdateInboundRtp(const nlohmann::json& raw);
@@ -346,7 +350,6 @@ namespace observertc::clientmonitor
 		nlohmann::json attachments;
 		nlohmann::json appData = nlohmann::json::object();
 		bool closed{ false };
-		std::vector<std::unique_ptr<StatsAdapter>> statsAdapters;
 		IssueRegistry issues;
 		std::unique_ptr<SlicedWindow> slicedWindow;
 		Detectors detectors;
