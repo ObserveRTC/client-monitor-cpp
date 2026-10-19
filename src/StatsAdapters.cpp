@@ -400,6 +400,35 @@ namespace observertc::clientmonitor
 				}
 			}
 		}
+
+
+		/**
+		 * libwebrtc's RTCStatsReport::ToJson() writes `timestamp` in microseconds since the epoch;
+		 * the W3C timestamp, and everything downstream here, is milliseconds. Left as is, every
+		 * elapsed time reads 1000 times longer than it was: rates come out 1000 times too low, and
+		 * a detector threshold in milliseconds is crossed after a single collection. An epoch
+		 * timestamp above 1e14 cannot be milliseconds (that is the year 5138), so a report that is
+		 * already in milliseconds is left alone.
+		 */
+		void NormalizeTimestamps(json& stats)
+		{
+			constexpr double MicrosecondsThreshold = 1e14;
+
+			for (auto& stat : stats)
+			{
+				if (!stat.is_object())
+				{
+					continue;
+				}
+
+				auto it = stat.find("timestamp");
+
+				if (it != stat.end() && it->is_number() && it->get<double>() > MicrosecondsThreshold)
+				{
+					*it = it->get<double>() / 1000.0;
+				}
+			}
+		}
 	} // namespace
 
 	const std::string& LibWebRtcStatsAdapter::GetName() const
@@ -409,7 +438,7 @@ namespace observertc::clientmonitor
 		return Name;
 	}
 
-	void LibWebRtcStatsAdapter::Adapt(json& stats)
+	void LibWebRtcStatsAdapter::Adapt(const std::string& /*peerConnectionId*/, json& stats)
 	{
 		CM_TRACE();
 
@@ -418,6 +447,7 @@ namespace observertc::clientmonitor
 			return;
 		}
 
+		NormalizeTimestamps(stats);
 		FoldLegacyTrackStats(stats);
 
 		for (auto& stat : stats)
@@ -442,5 +472,67 @@ namespace observertc::clientmonitor
 		InferTransportId(stats);
 		InferRtpCrossReferences(stats);
 		InferCodecId(stats);
+	}
+
+	/* DetachedSenderStatsAdapter */
+
+	const std::string DetachedSenderStatsAdapter::Name{ "detachedSenderStatsAdapter" };
+
+	const std::string& DetachedSenderStatsAdapter::GetName() const
+	{
+		return Name;
+	}
+
+	void DetachedSenderStatsAdapter::SetSenderTrack(
+	  const std::string& peerConnectionId, const std::string& mid, bool hasTrack)
+	{
+		// Kept when it becomes empty: a peer connection whose senders all lost their track is still
+		// one whose reports are corrected.
+		auto& senders = this->sendersWithTrack[peerConnectionId];
+
+		if (hasTrack)
+		{
+			senders.insert(mid);
+		}
+		else
+		{
+			senders.erase(mid);
+		}
+	}
+
+	void DetachedSenderStatsAdapter::RemovePeerConnection(const std::string& peerConnectionId)
+	{
+		this->sendersWithTrack.erase(peerConnectionId);
+	}
+
+	void DetachedSenderStatsAdapter::Adapt(const std::string& peerConnectionId, json& stats)
+	{
+		auto peerConnection = this->sendersWithTrack.find(peerConnectionId);
+
+		if (peerConnection == this->sendersWithTrack.end() || !stats.is_array())
+		{
+			return;
+		}
+
+		const auto& sendersWithTrack = peerConnection->second;
+
+		for (auto& stat : stats)
+		{
+			if (!stat.is_object() || !IsType(stat, "outbound-rtp") || !Has(stat, "mediaSourceId"))
+			{
+				continue;
+			}
+
+			auto mid = stat.find("mid");
+
+			if (mid == stat.end() || !mid->is_string())
+			{
+				continue;
+			}
+			if (!sendersWithTrack.count(mid->get<std::string>()))
+			{
+				stat.erase("mediaSourceId");
+			}
+		}
 	}
 } // namespace observertc::clientmonitor

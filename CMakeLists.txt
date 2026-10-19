@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.14)
 
 project(clientmonitor
-	VERSION 0.2.0
+	VERSION 0.3.0
 	DESCRIPTION "ObserveRTC client monitor for native WebRTC (libwebrtc / libmediasoupclient)"
 	HOMEPAGE_URL "https://github.com/ObserveRTC/client-monitor-cpp"
 	LANGUAGES CXX

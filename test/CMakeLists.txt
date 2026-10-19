@@ -11,9 +11,11 @@ set(
 	src/Detectors.test.cpp
 	src/IssueRegistry.test.cpp
 	src/Monitors.test.cpp
+	src/OutboundSenderBinding.test.cpp
 	src/Schema.test.cpp
 	src/SlicedWindow.test.cpp
 	src/StatsAdapter.test.cpp
+	src/StatsAdapterPipeline.test.cpp
 )
 
 add_executable(test_clientmonitor ${SOURCE_FILES})

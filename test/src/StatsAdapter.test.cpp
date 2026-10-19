@@ -28,7 +28,7 @@ TEST_CASE("LibWebRtcStatsAdapter", "[adapters]")
 	helpers::Counters counters;
 	auto stats = helpers::BuildReport(counters);
 
-	adapter.Adapt(stats);
+	adapter.Adapt("pc-1", stats);
 
 	SECTION("folds mediaType into kind and ip into address")
 	{
@@ -54,7 +54,7 @@ TEST_CASE("LibWebRtcStatsAdapter", "[adapters]")
 		  { { "type", "stream" }, { "id", "S1" } },
 		});
 
-		adapter.Adapt(legacy);
+		adapter.Adapt("pc-1", legacy);
 
 		REQUIRE(legacy.size() == 1);
 		REQUIRE(legacy[0]["trackIdentifier"] == "abc");

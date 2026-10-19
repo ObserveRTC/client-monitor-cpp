@@ -31,6 +31,24 @@ namespace observertc::clientmonitor
 				  webrtc::scoped_refptr<webrtc::MediaStreamTrackInterface>(track));
 			}
 
+			/** The mid of the producer's sender, which its `outbound-rtp` entries report. */
+			std::string MidOf(::mediasoupclient::Producer* producer)
+			{
+				try
+				{
+					const auto& rtpParameters = producer->GetRtpParameters();
+					auto it                   = rtpParameters.find("mid");
+
+					return it != rtpParameters.end() && it->is_string() ? it->get<std::string>() : std::string();
+				}
+				catch (const std::exception& error)
+				{
+					CM_WARN("cannot read the producer's mid: %s", error.what());
+
+					return std::string();
+				}
+			}
+
 			/** The SCTP stream id: what the RTCDataChannel stats call `dataChannelIdentifier`. */
 			std::optional<int64_t> StreamIdOf(const json& sctpStreamParameters)
 			{
@@ -125,6 +143,12 @@ namespace observertc::clientmonitor
 			auto* monitor =
 			  this->clientMonitor->AddPeerConnection(this->collector, this->transportId, attachments);
 
+			// One adapter for every send transport of the client monitor.
+			if (monitor && this->direction == "send" && !this->clientMonitor->GetStatsAdapter(DetachedSenderStatsAdapter::Name))
+			{
+				this->clientMonitor->AddStatsAdapter(std::make_unique<DetachedSenderStatsAdapter>());
+			}
+
 			this->FireEvent(ClientEventTypes::PEER_CONNECTION_OPENED, json::object());
 
 			return monitor;
@@ -144,7 +168,15 @@ namespace observertc::clientmonitor
 
 			std::lock_guard<std::recursive_mutex> lock(this->clientMonitor->GetMutex());
 
+			if (
+			  auto* adapter = dynamic_cast<DetachedSenderStatsAdapter*>(
+			    this->clientMonitor->GetStatsAdapter(DetachedSenderStatsAdapter::Name)))
+			{
+				adapter->RemovePeerConnection(this->transportId);
+			}
+
 			this->producerTracks.clear();
+			this->producerMids.clear();
 		}
 
 		PeerConnectionMonitor* TransportMonitor::GetPeerConnectionMonitor() const
@@ -166,6 +198,27 @@ namespace observertc::clientmonitor
       });
 		}
 
+		void TransportMonitor::SetSenderTrack(const std::string& mid, bool hasTrack)
+		{
+			if (mid.empty())
+			{
+				return;
+			}
+
+			std::lock_guard<std::recursive_mutex> lock(this->clientMonitor->GetMutex());
+
+			if (!this->collector)
+			{
+				return;
+			}
+			if (
+			  auto* adapter = dynamic_cast<DetachedSenderStatsAdapter*>(
+			    this->clientMonitor->GetStatsAdapter(DetachedSenderStatsAdapter::Name)))
+			{
+				adapter->SetSenderTrack(this->transportId, mid, hasTrack);
+			}
+		}
+
 		void TransportMonitor::TrackProducer(::mediasoupclient::Producer* producer)
 		{
 			// Everything that asks the track (IsPaused() is !track->enabled(), proxied to the
@@ -173,12 +226,22 @@ namespace observertc::clientmonitor
 			// waiting for that lock to report a state change.
 			const auto producerId = producer->GetId();
 			const auto trackId    = TrackIdOf(producer->GetTrack());
+			const auto mid        = MidOf(producer);
 			const bool paused     = producer->IsPaused();
 			auto track            = Wrap(producer->GetTrack());
 			std::string endedTrackId;
 
+			// ReplaceTrack(nullptr) leaves the sender without a track.
+			this->SetSenderTrack(mid, !trackId.empty());
+
 			{
 				std::lock_guard<std::recursive_mutex> lock(this->clientMonitor->GetMutex());
+
+				if (!mid.empty())
+				{
+					this->producerMids[producerId] = mid;
+				}
+
 				auto previous = this->producerTracks.find(producerId);
 
 				if (previous != this->producerTracks.end())
@@ -274,6 +337,7 @@ namespace observertc::clientmonitor
 		{
 			const auto producerId = producer->GetId();
 			std::string trackId;
+			std::string mid;
 
 			{
 				std::lock_guard<std::recursive_mutex> lock(this->clientMonitor->GetMutex());
@@ -284,11 +348,22 @@ namespace observertc::clientmonitor
 					trackId = it->second;
 					this->producerTracks.erase(it);
 				}
+
+				auto midIt = this->producerMids.find(producerId);
+
+				if (midIt != this->producerMids.end())
+				{
+					mid = midIt->second;
+					this->producerMids.erase(midIt);
+				}
 			}
 			if (trackId.empty())
 			{
 				trackId = TrackIdOf(producer->GetTrack());
 			}
+
+			// A closed producer's sender has no track, though libwebrtc keeps reporting it.
+			this->SetSenderTrack(mid.empty() ? MidOf(producer) : mid, false);
 			if (auto* monitor = this->GetPeerConnectionMonitor())
 			{
 				monitor->OnMediaTrackEnded(trackId);

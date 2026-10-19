@@ -319,6 +319,46 @@ peerConnection->AddMediaTrack(
 The track id must match the stats' `trackIdentifier`. Track attachments are copied into that
 track's sample entries.
 
+An outbound track reads the `outbound-rtp` streams whose `mediaSourceId` names a media source
+carrying its id, re-read on every report, so a stream follows its sender through
+`replaceTrack()`. When several media sources carry the id, the track is captured through the one
+a stream references.
+
+### Stats adapters
+
+`ClientMonitor::Collect()` takes the raw report of every peer connection from its
+`StatsCollector`, reports it through `Listener::OnRawStats()`, runs the client monitor's stats
+adapters on it in the order they were added, and then hands the W3C-shaped result to the peer
+connection monitor. `PeerConnectionMonitor::Accept(report)` takes the same path. The client monitor
+starts with a `LibWebRtcStatsAdapter` (legacy fields, inferred references, microsecond timestamps
+to milliseconds); add your own with `monitor.AddStatsAdapter(...)`. An adapter gets the peer
+connection id with each report.
+
+### Senders without a track
+
+W3C stats give a sender without a track no `mediaSourceId`. libwebrtc does not always: a sender
+whose track was removed (a closed mediasoup producer, for instance) keeps being reported with
+counters that no longer move and a `mediaSourceId`, sometimes that of a track a newer sender
+carries. A track would then read that sender's streams, and a sending track could be reported dry.
+`DetachedSenderStatsAdapter` corrects the report; tell it, per peer connection and by `mid`, which
+senders carry a track (the mediasoupclient binding does this for every producer):
+
+```cpp
+monitor.AddStatsAdapter(std::make_unique<observertc::clientmonitor::DetachedSenderStatsAdapter>());
+
+std::lock_guard<std::recursive_mutex> lock(monitor.GetMutex());
+auto* adapter = dynamic_cast<observertc::clientmonitor::DetachedSenderStatsAdapter*>(
+  monitor.GetStatsAdapter(observertc::clientmonitor::DetachedSenderStatsAdapter::Name));
+
+adapter->SetSenderTrack("pc-1", "0", true);  // a track is attached to the sender with mid "0"
+adapter->SetSenderTrack("pc-1", "0", false); // its track is removed, or the sender is closed
+adapter->RemovePeerConnection("pc-1");       // the peer connection is gone
+```
+
+For a peer connection it was told about, it removes `mediaSourceId` from the `outbound-rtp`
+entries of every other sender; other peer connections' reports pass unchanged. The entries and the
+media sources stay in the report and in the samples; they are just not bound to a track.
+
 ## Attachments
 
 Attachments are free-form JSON shipped on an object's entry in every sample. The observer joins on
@@ -364,7 +404,10 @@ web client join to the SFU the same way:
 | `inboundTracks[].attachments` | `{ producerId, consumerId }` | `OnConsumerCreated()` |
 | `dataChannels[].attachments` | `{ dataProducerId }` or `{ dataProducerId, dataConsumerId }` | `OnDataProducerCreated()`, `OnDataConsumerCreated()` |
 
-and the events `PEER_CONNECTION_OPENED` / `_CLOSED` / `_STATE_CHANGED`, `PRODUCER_ADDED` /
+For send transports it also adds a `DetachedSenderStatsAdapter` to the client monitor (once) and
+keeps it told which producers' senders carry a track, by transport id and the producer's `mid`.
+
+It sends the events `PEER_CONNECTION_OPENED` / `_CLOSED` / `_STATE_CHANGED`, `PRODUCER_ADDED` /
 `_REMOVED` / `_PAUSED` / `_RESUMED`, `CONSUMER_*`, `DATA_PRODUCER_*`, `DATA_CONSUMER_*` and
 `MEDIA_TRACK_REMOVED` with the producer and consumer ids spread in, each with its
 `peerConnectionId`. It also keeps the track contexts (`paused`, and `remoteOutboundTrackPaused`

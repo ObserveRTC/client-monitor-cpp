@@ -27,6 +27,9 @@ namespace observertc::clientmonitor
 		this->slicedWindow = std::make_unique<SlicedWindow>(
 		  this->CreateWindowConfig(this->config.clientWindow, WINDOW_TOTALS_COUNT));
 
+		// Native stats are Chromium's; the adapter is a no-op on an already standard report.
+		this->statsAdapters.push_back(std::make_unique<LibWebRtcStatsAdapter>());
+
 		if (this->config.bufferClientSamplesUntilSubscriber)
 		{
 			this->bufferedClientSamples.emplace();
@@ -201,6 +204,103 @@ namespace observertc::clientmonitor
 
 	/* Collection and sampling. */
 
+	void ClientMonitor::AddStatsAdapter(std::unique_ptr<StatsAdapter> adapter)
+	{
+		std::lock_guard<std::recursive_mutex> lock(this->mutex);
+
+		if (!adapter)
+		{
+			return;
+		}
+
+		for (const auto& existing : this->statsAdapters)
+		{
+			if (existing->GetName() == adapter->GetName())
+			{
+				CM_WARN("adapter with name %s already exists", adapter->GetName().c_str());
+
+				return;
+			}
+		}
+
+		this->statsAdapters.push_back(std::move(adapter));
+	}
+
+	bool ClientMonitor::RemoveStatsAdapter(const std::string& name)
+	{
+		std::lock_guard<std::recursive_mutex> lock(this->mutex);
+
+		const auto size = this->statsAdapters.size();
+
+		this->statsAdapters.erase(
+		  std::remove_if(
+		    this->statsAdapters.begin(),
+		    this->statsAdapters.end(),
+		    [&name](const std::unique_ptr<StatsAdapter>& adapter)
+		    {
+			    return adapter->GetName() == name;
+		    }),
+		  this->statsAdapters.end());
+
+		return size != this->statsAdapters.size();
+	}
+
+	StatsAdapter* ClientMonitor::GetStatsAdapter(const std::string& name) const
+	{
+		std::lock_guard<std::recursive_mutex> lock(this->mutex);
+
+		for (const auto& adapter : this->statsAdapters)
+		{
+			if (adapter->GetName() == name)
+			{
+				return adapter.get();
+			}
+		}
+
+		return nullptr;
+	}
+
+	json ClientMonitor::AdaptAndAccept(PeerConnectionMonitor& peerConnection, json rawStats)
+	{
+		const auto& peerConnectionId = peerConnection.GetPeerConnectionId();
+
+		this->Emit(
+		  [&](Listener* listener)
+		  {
+			  listener->OnRawStats(this, peerConnectionId, rawStats);
+		  });
+
+		for (auto& adapter : this->statsAdapters)
+		{
+			try
+			{
+				adapter->Adapt(peerConnectionId, rawStats);
+			}
+			catch (const std::exception& error)
+			{
+				CM_WARN("error adapting stats with %s: %s", adapter->GetName().c_str(), error.what());
+			}
+		}
+
+		peerConnection.AcceptAdaptedStats(rawStats);
+
+		return rawStats;
+	}
+
+	void ClientMonitor::AcceptStats(const std::string& peerConnectionId, json rawStats)
+	{
+		std::lock_guard<std::recursive_mutex> lock(this->mutex);
+
+		auto it = this->peerConnections.find(peerConnectionId);
+
+		if (this->closed || it == this->peerConnections.end() || it->second->IsClosed())
+		{
+			return;
+		}
+
+		this->AdaptAndAccept(*it->second, std::move(rawStats));
+	}
+
 	ClientMonitor::Listener::StatsCollectedEvent ClientMonitor::Collect()
 	{
 		CM_TRACE();
@@ -234,13 +334,13 @@ namespace observertc::clientmonitor
 		}
 
 		// Without the lock: a collector may block on the thread that owns the peer connection.
+		std::vector<std::pair<std::shared_ptr<PeerConnectionMonitor>, nlohmann::json>> rawReports;
+
 		for (auto& peerConnection : peerConnections)
 		{
 			try
 			{
-				auto stats = peerConnection->Collect();
-
-				event.collectedStats.emplace_back(peerConnection->GetPeerConnectionId(), std::move(stats));
+				rawReports.emplace_back(peerConnection, peerConnection->GetRawStats());
 			}
 			catch (const std::exception& error)
 			{
@@ -248,6 +348,27 @@ namespace observertc::clientmonitor
 				  "failed to get stats from peer connection %s: %s",
 				  peerConnection->GetPeerConnectionId().c_str(),
 				  error.what());
+			}
+		}
+
+		// Adapted to W3C shape first; only then do the peer connection monitors read them.
+		{
+			std::lock_guard<std::recursive_mutex> lock(this->mutex);
+
+			if (this->closed)
+			{
+				return event;
+			}
+
+			for (auto& [peerConnection, rawStats] : rawReports)
+			{
+				if (peerConnection->IsClosed())
+				{
+					continue;
+				}
+
+				event.collectedStats.emplace_back(
+				  peerConnection->GetPeerConnectionId(), this->AdaptAndAccept(*peerConnection, std::move(rawStats)));
 			}
 		}
 
@@ -532,9 +653,6 @@ namespace observertc::clientmonitor
 		auto peerConnection =
 		  std::make_shared<PeerConnectionMonitor>(this, id, std::move(statsCollector), attachments);
 		auto* raw = peerConnection.get();
-
-		// Native stats are Chromium's; the adapter is a no-op on an already standard report.
-		raw->AddStatsAdapter(std::make_unique<LibWebRtcStatsAdapter>());
 
 		this->peerConnections.emplace(id, std::move(peerConnection));
 		this->Emit(

@@ -74,6 +74,21 @@ per-transport state map), so the rest follow the same pattern.
 - **Track context merge.** A field set in the new context overrides; there is no way to clear a
   single field by passing it as `undefined`.
 - **Timestamps** are kept as `double` milliseconds and written as integers when whole.
+  `LibWebRtcStatsAdapter` converts libwebrtc's `RTCStatsReport::ToJson()` timestamps, which are
+  microseconds, to milliseconds.
+- **Stats adapters belong to the client monitor**, not to each peer connection monitor as in JS.
+  `ClientMonitor::Collect()` collects every peer connection's raw report, reports it
+  (`Listener::OnRawStats()`), adapts it with the peer connection id, and redistributes it to the
+  peer connection monitor.
+- **`DetachedSenderStatsAdapter`** has no JS counterpart: browsers stop reporting a sender's
+  `mediaSourceId` when its track is removed, libwebrtc does not. The mediasoupclient binding feeds
+  it.
+- **Outbound tracks re-read their streams on every report**, from `mediaSourceId`; the JS monitors
+  bind a stream to a track when either first appears. A repeated report (timestamp unchanged)
+  still updates `mediaSourceId`. When several media sources carry a track's id, the track takes the
+  one a stream references.
+- **A new outbound track with the id of an ended one** replaces its monitor instead of being
+  ignored until the ended one is dropped.
 
 - **Mediasoup data channel attachments** are declared by SCTP stream id
   (`PeerConnectionMonitor::SetDataChannelAttachments`) instead of watched on every stats event;

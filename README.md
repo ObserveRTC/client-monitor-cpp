@@ -20,7 +20,7 @@ include(FetchContent)
 FetchContent_Declare(
 	clientmonitor
 	GIT_REPOSITORY https://github.com/ObserveRTC/client-monitor-cpp.git
-	GIT_TAG v0.2.0
+	GIT_TAG v0.3.0
 )
 FetchContent_MakeAvailable(clientmonitor)
 
@@ -36,7 +36,7 @@ Or the release archive, which needs no git on the build machine:
 ```cmake
 FetchContent_Declare(
 	clientmonitor
-	URL https://github.com/ObserveRTC/client-monitor-cpp/releases/download/v0.2.0/client-monitor-cpp.tar.gz
+	URL https://github.com/ObserveRTC/client-monitor-cpp/releases/download/v0.3.0/client-monitor-cpp.tar.gz
 )
 ```
 
@@ -135,7 +135,7 @@ project(myapp_native LANGUAGES CXX)
 include(FetchContent)
 FetchContent_Declare(
     clientmonitor
-    URL https://github.com/ObserveRTC/client-monitor-cpp/releases/download/v0.2.0/client-monitor-cpp.tar.gz
+    URL https://github.com/ObserveRTC/client-monitor-cpp/releases/download/v0.3.0/client-monitor-cpp.tar.gz
     # or always the newest release (resolved on the first sync of a build directory only):
     # URL https://github.com/ObserveRTC/client-monitor-cpp/releases/latest/download/client-monitor-cpp.tar.gz
 )
@@ -385,7 +385,7 @@ application already built on libmediasoupclient finds the API familiar. New code
 
 1. Bump `VERSION` in `project(...)` in `CMakeLists.txt` and add a `## X.Y.Z` section to
    `CHANGELOG.md`.
-2. Commit, then tag and push: `git tag -a v0.2.0 -m "client-monitor-cpp 0.2.0" && git push origin main v0.2.0`.
+2. Commit, then tag and push: `git tag -a v0.3.0 -m "client-monitor-cpp 0.3.0" && git push origin main v0.3.0`.
 3. The release workflow checks the tag against `VERSION`, builds and tests, and publishes a GitHub
    release with `client-monitor-cpp.tar.gz` (and its `.sha256`), using the CHANGELOG section as
    the notes. It fails, and publishes nothing, if the versions differ or the section is missing.

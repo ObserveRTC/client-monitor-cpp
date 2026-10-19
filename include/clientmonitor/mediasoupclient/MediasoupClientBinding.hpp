@@ -32,6 +32,11 @@
  *
  * plus the PRODUCER_*, CONSUMER_*, DATA_PRODUCER_*, DATA_CONSUMER_*, PEER_CONNECTION_* and
  * MEDIA_TRACK_REMOVED events with the same payload keys.
+ *
+ * For send transports it adds a DetachedSenderStatsAdapter to the client monitor (once) and tells
+ * it which producers' senders carry a track (by transport id and the producer's `mid`), so a closed
+ * producer's `outbound-rtp` entries, which libwebrtc keeps reporting, are not bound to a track
+ * through a stale `mediaSourceId`.
  */
 
 #include "clientmonitor/ClientMonitor.hpp"
@@ -135,6 +140,8 @@ namespace observertc::clientmonitor
 			  const nlohmann::json& attachments);
 			/** Starts monitoring `producer`'s current track, dropping the one it had before. */
 			void TrackProducer(::mediasoupclient::Producer* producer);
+			/** Tells the client monitor's DetachedSenderStatsAdapter whether `mid`'s sender has a track. */
+			void SetSenderTrack(const std::string& mid, bool hasTrack);
 
 		private:
 			ClientMonitor* clientMonitor{ nullptr };
@@ -145,6 +152,8 @@ namespace observertc::clientmonitor
 			// Producer id -> the track id monitored for it. ReplaceTrack() changes the track, not
 			// the producer, and a closed producer may no longer name its track.
 			std::map<std::string, std::string> producerTracks;
+			// Producer id -> the mid of its sender, kept for when the producer is closed.
+			std::map<std::string, std::string> producerMids;
 		};
 
 		class MonitoredSendTransportListener : public ::mediasoupclient::SendTransport::Listener

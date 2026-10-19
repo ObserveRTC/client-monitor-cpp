@@ -185,6 +185,19 @@ int main()
 	    { "dataProducerId", "data-producer-1" }
   });
 
+	// Senders without a track: libwebrtc keeps reporting a sender whose track was removed with a
+	// stale mediaSourceId. Tell the adapter which senders (by mid) carry a track; the
+	// mediasoupclient binding does it for every producer.
+	// Adapters belong to the client monitor and run on every peer connection's raw report.
+	monitor.AddStatsAdapter(std::make_unique<observertc::clientmonitor::DetachedSenderStatsAdapter>());
+	{
+		std::lock_guard<std::recursive_mutex> lock(monitor.GetMutex());
+		auto* adapter = dynamic_cast<observertc::clientmonitor::DetachedSenderStatsAdapter*>(
+		  monitor.GetStatsAdapter(observertc::clientmonitor::DetachedSenderStatsAdapter::Name));
+
+		adapter->SetSenderTrack("pc-1", "0", true);
+	}
+
 	/* Track context: what the stats cannot show. Declarable before the track appears. */
 
 	observertc::clientmonitor::InboundTrackContext context;
