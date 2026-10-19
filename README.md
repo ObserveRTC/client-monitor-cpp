@@ -383,13 +383,18 @@ application already built on libmediasoupclient finds the API familiar. New code
 
 ## Releasing
 
-1. While working, add notes under `## Unreleased` at the top of `CHANGELOG.md`.
+1. While working, add notes under `## Unreleased` at the top of `CHANGELOG.md`. For a release
+   with breaking changes, write the steps an application takes to upgrade in
+   `docs/upgrade/X.Y.Z.md` (see [docs/upgrade/README.md](docs/upgrade/README.md)); the release is
+   refused without it.
 2. In the Actions tab, run the **Release** workflow on `main` with the version (`X.Y.Z`, without the
    `v`). Tick "dry run" first to see the changes and the notes it would publish.
 3. The workflow sets `VERSION` in `CMakeLists.txt`, renames `## Unreleased` to `## X.Y.Z` (or keeps
    an existing `## X.Y.Z` section), points the README pins at `vX.Y.Z`, builds and tests, commits
    that to `main`, and publishes the GitHub release `vX.Y.Z` (creating the tag) with
-   `client-monitor-cpp.tar.gz` and its `.sha256`, using the CHANGELOG section as the notes. It
+   `client-monitor-cpp.tar.gz`, its `.sha256` and `upgrade-prompt.md`, using the CHANGELOG section
+   as the notes. `upgrade-prompt.md` is `docs/upgrade-prompt.md` filled in with the version, the
+   upgrade steps and the notes, ready to hand to a coding agent that updates an application. It
    refuses a version that is not `X.Y.Z`, lower than the current one or already tagged, and one with
    no notes, and then publishes nothing. `scripts/prepare-release.sh X.Y.Z` does the file changes
    locally.
