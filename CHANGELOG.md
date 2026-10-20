@@ -4,6 +4,12 @@ All notable changes to client-monitor-cpp. Versions follow [Semantic Versioning]
 the version lives in `project(... VERSION ...)` in `CMakeLists.txt` and is tagged as `vX.Y.Z`. New notes go
 under `## Unreleased`; the Release workflow turns it into the version's section.
 
+## Unreleased
+
+- Every release carries `upgrade-prompt.md`: instructions for a coding agent that updates an
+  application to the release, with the upgrade steps (`docs/upgrade/X.Y.Z.md`) and the release
+  notes. A release with breaking changes needs its upgrade steps.
+
 ## 0.3.0
 
 Outbound tracks bind to the streams their sender sends now, also when libwebrtc keeps reporting

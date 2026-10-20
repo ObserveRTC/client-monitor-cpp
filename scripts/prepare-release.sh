@@ -1,20 +1,26 @@
 #!/usr/bin/env bash
 # Prepares the working tree for release X.Y.Z; the Release workflow runs it, and it runs locally too:
 #
-#   scripts/prepare-release.sh 0.4.0 [notes-file]
+#   scripts/prepare-release.sh 0.4.0 [notes-file] [prompt-file]
 #
 #   - sets VERSION in project(...) in CMakeLists.txt;
 #   - turns the `## Unreleased` section of CHANGELOG.md into `## X.Y.Z` (an existing `## X.Y.Z`
 #     section is kept as it is);
 #   - points the version pins in README.md at vX.Y.Z;
-#   - writes the section's text, the release notes, to notes-file (default: release-notes.md).
+#   - writes the section's text, the release notes, to notes-file (default: release-notes.md);
+#   - writes the upgrade prompt to prompt-file (default: upgrade-prompt.md): docs/upgrade-prompt.md
+#     filled in with the version, the previous version, the upgrade steps from
+#     docs/upgrade/X.Y.Z.md and the release notes. It is attached to the release, for handing to a
+#     coding agent that updates an application.
 #
-# It refuses a version that is not X.Y.Z, is lower than the current one, or has no notes. Running it
-# again with the same version changes nothing.
+# It refuses a version that is not X.Y.Z, is lower than the current one, has no notes, or is
+# breaking (its notes say **Breaking**) without docs/upgrade/X.Y.Z.md. A refused release leaves the
+# tree as it was. Running it again with the same version changes nothing.
 set -euo pipefail
 
 version="${1:-}"
 notes="${2:-release-notes.md}"
+prompt="${3:-upgrade-prompt.md}"
 
 if [[ ! "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
 	echo "version must be X.Y.Z (no leading v), got '${version}'" >&2
@@ -61,6 +67,37 @@ if ! grep -q '[^[:space:]]' "${notes}"; then
 	exit 1
 fi
 
+# The upgrade prompt. A breaking release has to say how to upgrade.
+steps_file="docs/upgrade/${version}.md"
+
+if [[ ! -f "${steps_file}" ]] && grep -q '\*\*Breaking' "${notes}"; then
+	echo "the ${version} notes say **Breaking**, but there is no ${steps_file} with the upgrade steps" >&2
+	rm -f "${notes}"
+	exit 1
+fi
+
+# The version before this one: the first version heading below the released section.
+previous="$(awk -v section="${section}" '
+	$0 ~ "^## " { if (seen && $2 ~ /^[0-9]+\.[0-9]+\.[0-9]+$/) { print $2; exit } if ($2 == section) seen = 1 }
+' CHANGELOG.md)"
+previous="${previous:-the previous version}"
+
+steps_tmp="$(mktemp)"
+trap 'rm -f "${steps_tmp}"' EXIT
+
+if [[ -f "${steps_file}" ]]; then
+	cat "${steps_file}" > "${steps_tmp}"
+else
+	printf '%s\n' "This release lists no breaking changes and no upgrade steps. Read the release notes below" \
+		"and adapt anything this project uses that they change." > "${steps_tmp}"
+fi
+
+awk -v version="${version}" -v previous="${previous}" -v steps="${steps_tmp}" -v notes="${notes}" '
+	$0 == "{{UPGRADE_STEPS}}" { while ((getline line < steps) > 0) print line; next }
+	$0 == "{{RELEASE_NOTES}}" { while ((getline line < notes) > 0) print line; next }
+	{ gsub(/\{\{VERSION\}\}/, version); gsub(/\{\{PREVIOUS_VERSION\}\}/, previous); print }
+' docs/upgrade-prompt.md > "${prompt}"
+
 # 1. CMakeLists.txt
 sed -i.bak "s/^\([[:space:]]*VERSION[[:space:]]\{1,\}\)${current//./\\.}/\1${version}/" CMakeLists.txt
 rm -f CMakeLists.txt.bak
@@ -81,4 +118,4 @@ sed -i.bak -E \
 	README.md
 rm -f README.md.bak
 
-echo "prepared ${version} (was ${current}); notes in ${notes}"
+echo "prepared ${version} (was ${current}); notes in ${notes}, upgrade prompt in ${prompt}"

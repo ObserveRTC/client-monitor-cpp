@@ -2,12 +2,14 @@ name: Release
 
 # Run from the Actions tab (Release → Run workflow) with a version, X.Y.Z. On main it:
 #   1. prepares the release with scripts/prepare-release.sh: VERSION in CMakeLists.txt, the
-#      `## Unreleased` section of CHANGELOG.md renamed to `## X.Y.Z`, the README pins;
+#      `## Unreleased` section of CHANGELOG.md renamed to `## X.Y.Z`, the README pins, and the
+#      upgrade prompt (docs/upgrade-prompt.md with docs/upgrade/X.Y.Z.md and the notes) that an
+#      application's coding agent can follow to update to the release;
 #   2. builds and tests that tree, and runs the examples;
 #   3. commits the change to main, if there is one;
-#   4. publishes the GitHub release vX.Y.Z (creating the tag) with the CHANGELOG section as notes
-#      and a source archive under a fixed name, so applications can fetch either one version or
-#      always the latest:
+#   4. publishes the GitHub release vX.Y.Z (creating the tag) with the CHANGELOG section as notes,
+#      upgrade-prompt.md, and a source archive under a fixed name, so applications can fetch either
+#      one version or always the latest:
 #        https://github.com/ObserveRTC/client-monitor-cpp/releases/download/vX.Y.Z/client-monitor-cpp.tar.gz
 #        https://github.com/ObserveRTC/client-monitor-cpp/releases/latest/download/client-monitor-cpp.tar.gz
 # With "dry run" it stops after step 2 and only shows what it would release.
@@ -62,7 +64,7 @@ jobs:
           fi
 
       - name: Prepare the release
-        run: scripts/prepare-release.sh "${VERSION}" release-notes.md
+        run: scripts/prepare-release.sh "${VERSION}" release-notes.md upgrade-prompt.md
 
       - name: Show the changes and the notes
         run: |
@@ -70,6 +72,8 @@ jobs:
           git --no-pager diff
           echo "----- release notes -----"
           cat release-notes.md
+          echo "----- upgrade prompt -----"
+          cat upgrade-prompt.md
 
       - name: Build and test
         run: |
@@ -107,8 +111,15 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
         run: |
+          {
+            echo
+            echo "---"
+            echo
+            echo "To update an application with a coding agent, give it \`upgrade-prompt.md\` from this release."
+          } >> release-notes.md
+
           gh release create "${TAG}" \
-            client-monitor-cpp.tar.gz client-monitor-cpp.tar.gz.sha256 \
+            client-monitor-cpp.tar.gz client-monitor-cpp.tar.gz.sha256 upgrade-prompt.md \
             --target "${SHA}" \
             --title "client-monitor-cpp ${TAG}" \
             --notes-file release-notes.md
